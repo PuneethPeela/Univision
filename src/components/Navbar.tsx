@@ -10,6 +10,7 @@ const navLinks = [
   { href: '/explore', label: 'Explore' },
   { href: '/compare', label: 'Compare' },
   { href: '/predict', label: 'Predict' },
+  { href: '/essay-predictor', label: 'Essay AI' },
   { href: '/discussions', label: 'Discuss' },
 ];
 
