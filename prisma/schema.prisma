@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CollegeType {
+  REACH
+  TARGET
+  SAFETY
+}
+
+model College {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  location         String
+  state            String?
+  type             CollegeType
+  description      String?
+  overview         String?
+  fees             Float?
+  rating           Float?
+  acceptanceRate   Float?
+  avgAid           Float?
+  gpa              Float?
+  sat              Float?
+  matchScore       Int?
+  research         Int?
+  campus           Int?
+  social           Int?
+  financial        Int?
+  innovation       Int?
+  diversity        Int?
+  courses          Json?
+  placements       Json?
+  majors           String[]
+  tags             String[]
+  imageUrl         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  reviews          Review[]
+  savedBy          SavedCollege[]
+  discussions      Discussion[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String?
+  email        String   @unique
+  passwordHash String?
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  savedColleges SavedCollege[]
+  discussions  Discussion[]
+  answers      Answer[]
+  reviews      Review[]
+  savedComparisons SavedComparison[]
+}
+
+model SavedCollege {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  college   College  @relation(fields: [collegeId], references: [id])
+  collegeId String
+  createdAt DateTime @default(now())
+  @@unique([userId, collegeId])
+}
+
+model Discussion {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  college   College? @relation(fields: [collegeId], references: [id])
+  collegeId String?
+  tags      String[]
+  upvotes   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  answers   Answer[]
+}
+
+model Answer {
+  id        String   @id @default(cuid())
+  body      String
+  discussion Discussion @relation(fields: [discussionId], references: [id])
+  discussionId String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  upvotes   Int      @default(0)
+  isAccepted Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  title     String?
+  body      String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  college   College  @relation(fields: [collegeId], references: [id])
+  collegeId String
+  createdAt DateTime @default(now())
+}
+
+model SavedComparison {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  name      String
+  collegeIds String[]
+  createdAt DateTime @default(now())
+}

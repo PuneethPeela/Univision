@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ── Tailwind v4 Theme ── */
+@theme {
+  --color-surface-900: #0a0b0f;
+  --color-surface-800: #111318;
+  --color-surface-700: #1a1b23;
+  --color-cyan: #00f4fe;
+  --color-lavender: #c5c4de;
+  --color-onSurface: #e8e9ed;
+  --color-muted: #9395a5;
+
+  --font-geist: 'DM Sans', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+
+  --animate-fadeUp: fadeUp 0.6s ease-out;
+  --animate-slideIn: slideIn 0.8s ease-out;
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-carouselSlide: carouselSlide 30s linear infinite;
+  --animate-spin: spin 1s linear infinite;
+
+  @keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideIn {
+    0% { opacity: 0; transform: translateX(-20px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  @keyframes carouselSlide {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+}
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+  font-synthesis: none;
+}
+
+body {
+  font-family: var(--font-inter);
+  background-color: var(--color-surface-900);
+  color: var(--color-onSurface);
+  margin: 0;
+  padding: 0;
+  overscroll-behavior-y: contain;
+}
+
+/* ── Glassmorphism ── */
+.glass {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+}
+
+.glass-cyan {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(0, 244, 254, 0.06);
+  border: 1px solid rgba(0, 244, 254, 0.2);
+  border-radius: 0.75rem;
+}
+
+/* ── Neon Effects ── */
+.neon-text {
+  text-shadow: 0 0 4px var(--color-cyan), 0 0 8px var(--color-cyan), 0 0 12px var(--color-cyan);
+}
+
+.neon-glow {
+  box-shadow: 0 0 8px var(--color-cyan), 0 0 16px var(--color-cyan);
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface-800);
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 244, 254, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-cyan);
+}
+
+/* ── Utility ── */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
