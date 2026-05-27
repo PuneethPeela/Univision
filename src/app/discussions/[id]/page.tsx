@@ -37,6 +37,14 @@ export default function DiscussionDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Edit states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editBody, setEditBody] = useState('');
+  const [updating, setUpdating] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
+
   const fetchDetail = useCallback(() => {
     fetch(`/api/discussions/${id}`)
       .then((r) => r.json())
@@ -77,6 +85,38 @@ export default function DiscussionDetailPage() {
     setSubmitting(false);
   };
 
+  const handleEditInit = () => {
+    if (!discussion) return;
+    setEditTitle(discussion.title);
+    setEditBody(discussion.body);
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editTitle.trim() || !editBody.trim() || updating) return;
+    setUpdating(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/discussions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle.trim(), body: editBody.trim() }),
+      });
+      if (res.ok) {
+        const updatedDiscussion = await res.json();
+        setDiscussion((d) => d ? { ...d, title: updatedDiscussion.title, body: updatedDiscussion.body } : d);
+        setIsEditing(false);
+      } else {
+        const data = await res.json();
+        setEditError(data.error ? JSON.stringify(data.error) : 'Failed to update question.');
+      }
+    } catch {
+      setEditError('An error occurred while saving changes.');
+    }
+    setUpdating(false);
+  };
+
   const handleDelete = async () => {
     if (!discussion || deleting) return;
     const confirmDelete = window.confirm(
@@ -103,7 +143,7 @@ export default function DiscussionDetailPage() {
   };
 
   const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
+    const diff = now - new Date(date).getTime();
     if (diff < 0) return 'just now';
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
@@ -145,43 +185,99 @@ export default function DiscussionDetailPage() {
 
       {/* Question */}
       <div className="glass p-6 animate-fadeUp relative">
-        <div className="flex gap-4">
-          {/* Votes */}
-          <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={handleUpvote}
-              aria-label="Upvote this question"
-              className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted hover:text-cyan hover:border-cyan/30 transition-all"
-            >
-              ▲
-            </button>
-            <span className="text-lg font-bold text-onSurface">{discussion.upvotes}</span>
-          </div>
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start gap-4">
-              <h1 className="text-xl font-geist font-bold text-onSurface break-words">{discussion.title}</h1>
-              {isAuthor && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition disabled:opacity-50 whitespace-nowrap"
-                >
-                  {deleting ? 'Deleting…' : 'Delete Question'}
-                </button>
-              )}
-            </div>
-            <p className="text-muted text-sm mt-3 leading-relaxed whitespace-pre-wrap break-words">{discussion.body}</p>
-            <div className="flex items-center gap-3 mt-4 text-xs text-muted">
-              <div className="w-6 h-6 rounded-full bg-cyan/20 flex items-center justify-center text-cyan text-[10px] font-bold">
-                {discussion.user.name?.[0] || '?'}
+        {isEditing ? (
+          /* Editing Form */
+          <div className="space-y-4">
+            <h3 className="font-geist font-semibold text-cyan">Edit Question</h3>
+            {editError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-lg">
+                {editError}
               </div>
-              <span>{discussion.user.name || 'Anonymous'}</span>
-              <span>•</span>
-              <span>{timeAgo(discussion.createdAt)}</span>
+            )}
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Question title…"
+              maxLength={200}
+              aria-label="Edit title"
+              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm placeholder-muted focus:outline-none focus:border-cyan/40"
+            />
+            <textarea
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              placeholder="Describe your question in detail…"
+              rows={6}
+              maxLength={5000}
+              aria-label="Edit body"
+              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm placeholder-muted focus:outline-none focus:border-cyan/40 resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleUpdate}
+                disabled={updating || editTitle.trim().length < 5 || editBody.trim().length < 10}
+                className="px-4 py-2 bg-cyan text-surface-900 font-semibold text-xs rounded-lg disabled:opacity-50 transition"
+              >
+                {updating ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 border border-white/10 text-xs text-muted rounded-lg hover:text-onSurface transition"
+              >
+                Cancel
+              </button>
+              <span className="text-xs text-muted ml-auto mt-2">
+                {editTitle.length}/200 · {editBody.length}/5000
+              </span>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Regular View */
+          <div className="flex gap-4">
+            {/* Votes */}
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={handleUpvote}
+                aria-label="Upvote this question"
+                className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted hover:text-cyan hover:border-cyan/30 transition-all"
+              >
+                ▲
+              </button>
+              <span className="text-lg font-bold text-onSurface">{discussion.upvotes}</span>
+            </div>
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start gap-4">
+                <h1 className="text-xl font-geist font-bold text-onSurface break-words">{discussion.title}</h1>
+                {isAuthor && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleEditInit}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-cyan/20 bg-cyan/5 text-cyan hover:bg-cyan/10 transition whitespace-nowrap"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-muted text-sm mt-3 leading-relaxed whitespace-pre-wrap break-words">{discussion.body}</p>
+              <div className="flex items-center gap-3 mt-4 text-xs text-muted">
+                <div className="w-6 h-6 rounded-full bg-cyan/20 flex items-center justify-center text-cyan text-[10px] font-bold">
+                  {discussion.user.name?.[0] || '?'}
+                </div>
+                <span>{discussion.user.name || 'Anonymous'}</span>
+                <span>•</span>
+                <span>{timeAgo(discussion.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Answers header */}
@@ -223,6 +319,7 @@ export default function DiscussionDetailPage() {
             value={answerBody}
             onChange={(e) => setAnswerBody(e.target.value)}
             placeholder="Write your answer…"
+            aria-label="Write your answer"
             rows={4}
             maxLength={2000}
             className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm placeholder-muted focus:outline-none focus:border-cyan/40 resize-none"

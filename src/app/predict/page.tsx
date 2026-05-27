@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface PredictResult {
   id: string;
@@ -45,6 +45,27 @@ export default function PredictPage() {
     safety: PredictResult[];
   } | null>(null);
   const [error, setError] = useState('');
+  const [autoFilled, setAutoFilled] = useState(false);
+
+  useEffect(() => {
+    // Attempt to pre-fill from user academic profile
+    fetch('/api/profile')
+      .then((r) => {
+        if (r.ok) return r.json();
+      })
+      .then((data) => {
+        if (data) {
+          if (data.gpa != null) setGpa(String(data.gpa));
+          if (data.sat != null) {
+            setScore(String(data.sat));
+            setExam('SAT');
+          }
+          if (data.major != null) setMajor(data.major);
+          setAutoFilled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async () => {
     setError('');
@@ -111,7 +132,7 @@ export default function PredictPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pt-24 space-y-8">
+    <div className="max-w-4xl mx-auto pt-24 px-4 md:px-8 space-y-8">
       {/* Header */}
       <div className="space-y-2 animate-fadeUp">
         <h1 className="text-3xl md:text-4xl font-geist font-bold text-onSurface">
@@ -123,12 +144,19 @@ export default function PredictPage() {
       </div>
 
       {/* Form */}
-      <div className="glass p-6 md:p-8 space-y-6 animate-fadeUp">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="glass p-6 md:p-8 space-y-6 animate-fadeUp relative overflow-hidden">
+        {autoFilled && (
+          <div className="absolute top-0 right-0 left-0 bg-cyan/10 border-b border-cyan/20 px-6 py-2 flex items-center justify-between text-xs text-cyan font-bold tracking-wider">
+            <span>✓ Pre-filled using your Cockpit academic profile metrics</span>
+            <button onClick={() => setAutoFilled(false)} className="text-[10px] opacity-75 hover:opacity-100 uppercase">Dismiss</button>
+          </div>
+        )}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${autoFilled ? 'pt-6' : ''}`}>
           {/* Exam */}
           <div>
-            <label className="text-xs text-muted uppercase tracking-wider block mb-2">Exam</label>
+            <label htmlFor="predict-exam-select" className="text-xs text-muted uppercase tracking-wider block mb-2">Exam</label>
             <select
+              id="predict-exam-select"
               value={exam}
               onChange={(e) => setExam(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm focus:outline-none focus:border-cyan/50 transition-all"
@@ -143,10 +171,11 @@ export default function PredictPage() {
 
           {/* Score */}
           <div>
-            <label className="text-xs text-muted uppercase tracking-wider block mb-2">
+            <label htmlFor="predict-score-input" className="text-xs text-muted uppercase tracking-wider block mb-2">
               Score / Rank
             </label>
             <input
+              id="predict-score-input"
               type="number"
               value={score}
               onChange={(e) => setScore(e.target.value)}
@@ -157,8 +186,9 @@ export default function PredictPage() {
 
           {/* GPA */}
           <div>
-            <label className="text-xs text-muted uppercase tracking-wider block mb-2">GPA (0-4.0)</label>
+            <label htmlFor="predict-gpa-input" className="text-xs text-muted uppercase tracking-wider block mb-2">GPA (0-4.0)</label>
             <input
+              id="predict-gpa-input"
               type="number"
               value={gpa}
               onChange={(e) => setGpa(e.target.value)}
@@ -172,8 +202,9 @@ export default function PredictPage() {
 
           {/* Major */}
           <div>
-            <label className="text-xs text-muted uppercase tracking-wider block mb-2">Preferred Major</label>
+            <label htmlFor="predict-major-select" className="text-xs text-muted uppercase tracking-wider block mb-2">Preferred Major</label>
             <select
+              id="predict-major-select"
               value={major}
               onChange={(e) => setMajor(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm focus:outline-none focus:border-cyan/50 transition-all"

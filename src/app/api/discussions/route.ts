@@ -12,15 +12,29 @@ const createSchema = z.object({
   tags: z.array(z.string().max(50)).max(10).optional(),
 });
 
+const discussionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  sort: z.enum(['recent', 'popular', 'unanswered']).default('recent'),
+  q: z.string().max(100).optional().default(''),
+});
+
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const rawPage = parseInt(searchParams.get('page') || '1', 10);
-    const rawLimit = parseInt(searchParams.get('limit') || '10', 10);
-    const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
-    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 10 : rawLimit), 50);
-    const sort = searchParams.get('sort') || 'recent';
-    const q = searchParams.get('q') || '';
+    const url = new URL(req.url);
+    const paramsObj = {
+      page: url.searchParams.get('page') || undefined,
+      limit: url.searchParams.get('limit') || undefined,
+      sort: url.searchParams.get('sort') || undefined,
+      q: url.searchParams.get('q') || undefined,
+    };
+
+    const parsed = discussionsQuerySchema.safeParse(paramsObj);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { page, limit, sort, q } = parsed.data;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};

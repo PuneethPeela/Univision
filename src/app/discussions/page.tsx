@@ -55,16 +55,25 @@ export default function DiscussionsPage() {
     setLoading(false);
   }, [query, sortTab]);
 
-  // Reset on filter/search change
+  // Fetch when page or query/sortTab changes
   useEffect(() => {
-    setPage(1);
-    fetchDiscussions(1, true);
-  }, [fetchDiscussions]);
+    fetchDiscussions(page, page === 1);
+  }, [page, fetchDiscussions]);
 
   const loadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
     fetchDiscussions(nextPage, false);
+  };
+
+  const handleSortTabChange = (tab: string) => {
+    setSortTab(tab);
+    setPage(1);
+  };
+
+  const handleSearch = (q: string) => {
+    setQuery(q);
+    setPage(1);
   };
 
   const handleCreate = async () => {
@@ -93,8 +102,10 @@ export default function DiscussionsPage() {
     setSubmitting(false);
   };
 
+  const [now] = useState(() => Date.now());
+
   const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
+    const diff = now - new Date(date).getTime();
     if (diff < 0) return 'just now';
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
@@ -181,14 +192,14 @@ export default function DiscussionsPage() {
 
       {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <SearchBar onSearch={setQuery} placeholder="Search discussions…" />
+        <SearchBar onSearch={handleSearch} placeholder="Search discussions…" />
         <div className="flex gap-1 bg-white/5 rounded-lg p-1" role="tablist" aria-label="Sort discussions">
           {sortTabs.map((tab) => (
             <button
               key={tab}
               role="tab"
               aria-selected={sortTab === tab}
-              onClick={() => setSortTab(tab)}
+              onClick={() => handleSortTabChange(tab)}
               className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
                 sortTab === tab
                   ? 'bg-cyan/15 text-cyan'

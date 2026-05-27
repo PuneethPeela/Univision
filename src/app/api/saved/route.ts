@@ -1,8 +1,14 @@
-export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
+
+export const dynamic = 'force-dynamic';
+
+const savedCreateSchema = z.object({
+  collegeId: z.string().min(1, 'collegeId required').max(50),
+});
 
 export async function GET() {
   try {
@@ -31,9 +37,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { collegeId } = await req.json();
-    if (!collegeId) {
-      return NextResponse.json({ error: 'collegeId required' }, { status: 400 });
+    const body = await req.json();
+    const parsed = savedCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { collegeId } = parsed.data;
+
+    // Verify college exists before attempting to save
+    const college = await prisma.college.findUnique({
+      where: { id: collegeId },
+      select: { id: true },
+    });
+    if (!college) {
+      return NextResponse.json({ error: 'College not found' }, { status: 404 });
     }
 
     const existing = await prisma.savedCollege.findUnique({

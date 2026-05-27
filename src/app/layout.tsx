@@ -1,6 +1,7 @@
 import '@/app/globals.css';
 import Navbar from '@/components/Navbar';
 import Providers from '@/components/Providers';
+import AIAssistant from '@/components/AIAssistant';
 import type { Metadata } from 'next';
 import { Inter, DM_Sans } from 'next/font/google';
 
@@ -35,6 +36,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <main className="min-h-screen">{children}</main>
+          <AIAssistant />
         </Providers>
       </body>
     </html>

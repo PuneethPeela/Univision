@@ -26,6 +26,15 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
+    // Verify discussion exists
+    const discussion = await prisma.discussion.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!discussion) {
+      return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
+    }
+
     const answer = await prisma.answer.create({
       data: {
         body: parsed.data.body,

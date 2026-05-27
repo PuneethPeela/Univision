@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import Link from 'next/link';
 
 interface College {
   id: string;
@@ -32,7 +30,6 @@ interface AnalysisResults {
 }
 
 export default function EssayPredictorPage() {
-  const { data: session } = useSession();
   const [colleges, setColleges] = useState<College[]>([]);
   const [loadingColleges, setLoadingColleges] = useState(true);
   
@@ -127,11 +124,12 @@ export default function EssayPredictorPage() {
           <form onSubmit={handleAnalyze} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted uppercase tracking-wider block mb-1.5">Target College</label>
+                <label htmlFor="essay-target-college" className="text-xs text-muted uppercase tracking-wider block mb-1.5">Target College</label>
                 {loadingColleges ? (
                   <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
                 ) : (
                   <select
+                    id="essay-target-college"
                     value={selectedCollege}
                     onChange={(e) => setSelectedCollege(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm focus:outline-none focus:border-cyan/50"
@@ -146,8 +144,9 @@ export default function EssayPredictorPage() {
               </div>
 
               <div>
-                <label className="text-xs text-muted uppercase tracking-wider block mb-1.5">Intended Major</label>
+                <label htmlFor="essay-intended-major" className="text-xs text-muted uppercase tracking-wider block mb-1.5">Intended Major</label>
                 <input
+                  id="essay-intended-major"
                   type="text"
                   required
                   value={major}
@@ -160,12 +159,13 @@ export default function EssayPredictorPage() {
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs text-muted uppercase tracking-wider block">Essay Draft</label>
+                <label htmlFor="essay-draft-textarea" className="text-xs text-muted uppercase tracking-wider block">Essay Draft</label>
                 <span className={`text-xs ${wordCount > 650 ? 'text-yellow-400' : 'text-muted'}`}>
                   {wordCount} words
                 </span>
               </div>
               <textarea
+                id="essay-draft-textarea"
                 required
                 value={essayText}
                 onChange={(e) => setEssayText(e.target.value)}

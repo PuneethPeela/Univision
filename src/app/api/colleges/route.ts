@@ -1,19 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
-import { Prisma } from '@prisma/client';
+
+const collegesQuerySchema = z.object({
+  q: z.string().max(100).optional().default(''),
+  type: z.enum(['REACH', 'TARGET', 'SAFETY']).optional(),
+  tag: z.string().max(50).optional(),
+  sort: z.enum(['match', 'name', 'rating']).default('match'),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+});
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const q = searchParams.get('q') || '';
-    const type = searchParams.get('type');
-    const tag = searchParams.get('tag');
-    const sort = searchParams.get('sort') || 'match';
-    const cursor = searchParams.get('cursor');
-    const rawLimit = parseInt(searchParams.get('limit') || '12', 10);
-    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 12 : rawLimit), 50); // Clamp 1-50
+    const url = new URL(req.url);
+    const paramsObj = {
+      q: url.searchParams.get('q') || undefined,
+      type: url.searchParams.get('type') || undefined,
+      tag: url.searchParams.get('tag') || undefined,
+      sort: url.searchParams.get('sort') || undefined,
+      cursor: url.searchParams.get('cursor') || undefined,
+      limit: url.searchParams.get('limit') || undefined,
+    };
+
+    const parsed = collegesQuerySchema.safeParse(paramsObj);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { q, type, tag, sort, cursor, limit } = parsed.data;
 
     const where: Prisma.CollegeWhereInput = {};
 
@@ -26,10 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (type) {
-      const upperType = type.toUpperCase();
-      if (['REACH', 'TARGET', 'SAFETY'].includes(upperType)) {
-        where.type = upperType as Prisma.EnumCollegeTypeFilter;
-      }
+      where.type = type;
     }
 
     if (tag) {
@@ -43,6 +58,7 @@ export async function GET(req: NextRequest) {
           ? { rating: 'desc' }
           : { matchScore: 'desc' };
 
+    // Attempt to query database
     const colleges = await prisma.college.findMany({
       where,
       orderBy,

@@ -6,18 +6,28 @@ import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 
 const navLinks = [
-  { href: '/', label: 'Home' },
-  { href: '/explore', label: 'Explore' },
-  { href: '/compare', label: 'Compare' },
-  { href: '/predict', label: 'Predict' },
-  { href: '/essay-predictor', label: 'Essay AI' },
-  { href: '/discussions', label: 'Discuss' },
+  { href: '/', label: 'HOME' },
+  { href: '/predict', label: 'MATCH' },
+  { href: '/explore', label: 'EXPLORE' },
+  { href: '/compare', label: 'COMPARE' },
+  { href: '/dashboard', label: 'TRACK' },
+  { href: '/essay-predictor', label: 'ESSAY AI' },
+  { href: '/discussions', label: 'DISCUSS' },
 ];
+
 
 export default function Navbar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    return pathname === href;
+  };
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 backdrop-blur-xl bg-surface-900/70 border-b border-white/5 transition-all duration-300">
@@ -28,17 +38,20 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <ul className="hidden md:flex items-center gap-6">
+        <ul className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
-            <li key={link.href}>
+            <li key={link.href} className="relative py-1">
               <Link
                 href={link.href}
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  pathname === link.href ? 'text-cyan' : 'text-muted hover:text-onSurface'
+                className={`text-[11px] font-bold tracking-widest transition-colors duration-200 ${
+                  isActive(link.href) ? 'text-cyan font-extrabold' : 'text-muted hover:text-onSurface'
                 }`}
               >
                 {link.label}
               </Link>
+              {isActive(link.href) && (
+                <span className="absolute -bottom-[15px] inset-x-0 h-[2px] bg-cyan shadow-[0_0_8px_rgba(0,244,254,0.8)]" />
+              )}
             </li>
           ))}
         </ul>
@@ -52,19 +65,91 @@ export default function Navbar() {
           </div>
 
           {status === 'authenticated' ? (
-            <div className="flex items-center gap-3">
-              <Link href="/saved" className="text-sm text-muted hover:text-cyan transition-colors">
+            <div className="relative flex items-center gap-3">
+              <Link href="/saved" className="text-sm text-muted hover:text-cyan transition-colors font-medium">
                 Saved
               </Link>
-              <button
-                onClick={() => signOut()}
-                className="flex items-center gap-2 text-sm text-muted hover:text-cyan transition-colors"
-              >
-                <div className="w-7 h-7 rounded-full bg-cyan/20 flex items-center justify-center text-cyan text-xs font-bold border border-cyan/30">
-                  {session.user?.name?.[0] || '?'}
-                </div>
-                <span className="hidden lg:inline">{session.user?.name || 'User'}</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 text-sm text-muted hover:text-cyan transition-colors focus:outline-none"
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                >
+                  <div className="w-7 h-7 rounded-full bg-cyan/20 flex items-center justify-center text-cyan text-xs font-bold border border-cyan/30">
+                    {session.user?.name?.[0] || '?'}
+                  </div>
+                  <span className="hidden lg:inline font-medium">{session.user?.name || 'User'}</span>
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {dropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[999]" onClick={() => setDropdownOpen(false)} />
+                    <div className="absolute right-0 mt-3 w-56 bg-[#111318] rounded-xl shadow-2xl z-[1000] border border-white/10 animate-fadeUp overflow-hidden py-1">
+                      {/* User Info Header */}
+                      <div className="px-4 py-3 border-b border-white/5 bg-white/2.5">
+
+                        <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Signed in as</p>
+                        <p className="text-sm font-bold text-onSurface truncate mt-0.5">{session.user?.name || 'Academic Scholar'}</p>
+                        <p className="text-[10px] text-muted truncate mt-0.5">{session.user?.email}</p>
+                      </div>
+
+
+                      {/* Items */}
+                      <Link
+                        href="/dashboard?tab=overview"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted hover:text-cyan hover:bg-white/5 transition-colors font-semibold"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        📊 Cockpit Dashboard
+                      </Link>
+                      <Link
+                        href="/dashboard?tab=tracker"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted hover:text-cyan hover:bg-white/5 transition-colors font-semibold"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        📋 Application Status
+                      </Link>
+                      <Link
+                        href="/dashboard?tab=profile"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted hover:text-cyan hover:bg-white/5 transition-colors font-semibold"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        👤 Academic Profile
+                      </Link>
+                      <Link
+                        href="/dashboard?tab=settings"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted hover:text-cyan hover:bg-white/5 transition-colors font-semibold"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        ⚙️ System Settings
+                      </Link>
+                      <Link
+                        href="/discussions"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted hover:text-cyan hover:bg-white/5 transition-colors font-semibold"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        💬 Community Discussions
+                      </Link>
+
+                      <div className="border-t border-white/5 mt-1" />
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          signOut({ callbackUrl: '/' });
+                        }}
+                        className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors font-bold"
+                      >
+                        🚪 Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <Link
@@ -103,8 +188,8 @@ export default function Navbar() {
                 <Link
                   href={link.href}
                   className={`block py-2 px-3 rounded-lg text-sm transition-colors ${
-                    pathname === link.href
-                      ? 'text-cyan bg-cyan/10'
+                    isActive(link.href)
+                      ? 'text-cyan bg-cyan/10 font-bold'
                       : 'text-muted hover:text-onSurface hover:bg-white/5'
                   }`}
                   onClick={() => setMobileOpen(false)}
@@ -115,19 +200,52 @@ export default function Navbar() {
             ))}
             <li className="border-t border-white/5 pt-2 mt-2">
               {status === 'authenticated' ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-muted uppercase tracking-wider px-3 mb-1 font-bold">Cockpit Menu</span>
                   <Link
-                    href="/saved"
-                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface"
+                    href="/dashboard?tab=overview"
+                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface hover:bg-white/5"
                     onClick={() => setMobileOpen(false)}
                   >
-                    Saved Colleges
+                    📊 Cockpit Dashboard
                   </Link>
-                  <button
-                    onClick={() => { signOut(); setMobileOpen(false); }}
-                    className="text-left py-2 px-3 rounded-lg text-sm text-muted hover:text-red-400 transition-colors"
+                  <Link
+                    href="/dashboard?tab=tracker"
+                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface hover:bg-white/5"
+                    onClick={() => setMobileOpen(false)}
                   >
-                    Sign Out
+                    📋 Application Status
+                  </Link>
+                  <Link
+                    href="/dashboard?tab=profile"
+                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface hover:bg-white/5"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    👤 Academic Profile
+                  </Link>
+                  <Link
+                    href="/dashboard?tab=settings"
+                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface hover:bg-white/5"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    ⚙️ System Settings
+                  </Link>
+                  <Link
+                    href="/saved"
+                    className="block py-2 px-3 rounded-lg text-sm text-muted hover:text-onSurface hover:bg-white/5"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    📌 Curated Shortlist
+                  </Link>
+                  <div className="border-t border-white/5 my-1" />
+                  <button
+                    onClick={() => {
+                      signOut({ callbackUrl: '/' });
+                      setMobileOpen(false);
+                    }}
+                    className="w-full text-left py-2 px-3 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    🚪 Sign Out
                   </button>
                 </div>
               ) : (

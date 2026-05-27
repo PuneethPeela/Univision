@@ -138,7 +138,7 @@ export default function CollegeDetailPage() {
   const placements = college.placements as Placements | null;
 
   return (
-    <div className="max-w-5xl mx-auto pt-24 space-y-8">
+    <div className="max-w-5xl mx-auto pt-24 px-4 md:px-8 space-y-8">
       {/* Back */}
       <Link href="/explore" className="text-sm text-muted hover:text-cyan transition-colors">
         ← Back to Explore
@@ -283,8 +283,9 @@ export default function CollegeDetailPage() {
             <div className="glass p-6 space-y-4">
               <h3 className="font-geist font-semibold text-onSurface">Write a Review</h3>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-muted">Rating:</label>
+                <label htmlFor="review-rating" className="text-sm text-muted">Rating:</label>
                 <select
+                  id="review-rating"
                   value={reviewForm.rating}
                   onChange={(e) => setReviewForm((f) => ({ ...f, rating: parseInt(e.target.value) }))}
                   className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-onSurface text-sm"
@@ -297,12 +298,16 @@ export default function CollegeDetailPage() {
                 </select>
               </div>
               <input
+                id="review-title"
+                aria-label="Review title"
                 value={reviewForm.title}
                 onChange={(e) => setReviewForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="Review title…"
                 className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface text-sm placeholder-muted focus:outline-none focus:border-cyan/40"
               />
               <textarea
+                id="review-body"
+                aria-label="Review body"
                 value={reviewForm.body}
                 onChange={(e) => setReviewForm((f) => ({ ...f, body: e.target.value }))}
                 placeholder="Share your experience…"

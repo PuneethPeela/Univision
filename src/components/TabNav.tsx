@@ -8,10 +8,12 @@ interface TabNavProps {
 
 export default function TabNav({ tabs, active, onChange }: TabNavProps) {
   return (
-    <div className="flex gap-1 border-b border-white/10 mb-6">
+    <div className="flex gap-1 border-b border-white/10 mb-6" role="tablist" aria-label="Navigation tabs">
       {tabs.map((tab) => (
         <button
           key={tab}
+          role="tab"
+          aria-selected={active === tab}
           onClick={() => onChange(tab)}
           className={`px-5 py-2.5 text-sm font-medium transition-all duration-200 relative ${
             active === tab

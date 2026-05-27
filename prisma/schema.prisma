@@ -52,6 +52,9 @@ model User {
   email        String   @unique
   passwordHash String?
   image        String?
+  gpa          Float?
+  sat          Int?
+  major        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   savedColleges SavedCollege[]
@@ -67,8 +70,11 @@ model SavedCollege {
   userId    String
   college   College  @relation(fields: [collegeId], references: [id])
   collegeId String
+  status    String   @default("RESEARCHING")
   createdAt DateTime @default(now())
+
   @@unique([userId, collegeId])
+  @@index([collegeId])
 }
 
 model Discussion {
@@ -84,6 +90,11 @@ model Discussion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   answers   Answer[]
+
+  @@index([userId])
+  @@index([collegeId])
+  @@index([createdAt])
+  @@index([upvotes])
 }
 
 model Answer {
@@ -97,6 +108,9 @@ model Answer {
   isAccepted Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([discussionId])
+  @@index([userId])
 }
 
 model Review {
@@ -109,6 +123,9 @@ model Review {
   college   College  @relation(fields: [collegeId], references: [id])
   collegeId String
   createdAt DateTime @default(now())
+
+  @@index([collegeId])
+  @@index([userId])
 }
 
 model SavedComparison {
@@ -118,4 +135,6 @@ model SavedComparison {
   name      String
   collegeIds String[]
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }

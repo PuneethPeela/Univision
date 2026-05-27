@@ -112,7 +112,22 @@ export default function SpiderChart({ axes, datasets, size = 280 }: SpiderChartP
 
   return (
     <div className="flex flex-col items-center">
-      <canvas ref={canvasRef} />
+      <canvas
+        ref={canvasRef}
+        role="img"
+        aria-label={`Spider chart comparing ${datasets.map((d) => d.label).join(', ')}`}
+      >
+        <div className="sr-only">
+          <p>Comparison data breakdown:</p>
+          <ul>
+            {datasets.map((ds) => (
+              <li key={ds.label}>
+                {ds.label}: {axes.map((axis, idx) => `${axis}: ${ds.values[idx] || 0}`).join(', ')}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </canvas>
       {/* Legend */}
       <div className="flex gap-4 mt-3">
         {datasets.map((ds) => (
@@ -120,6 +135,7 @@ export default function SpiderChart({ axes, datasets, size = 280 }: SpiderChartP
             <span
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: ds.color }}
+              aria-hidden="true"
             />
             {ds.label}
           </div>

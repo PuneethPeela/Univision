@@ -1,6 +1,4 @@
-"use client";
-
-import { ReactNode, useRef, useEffect, useState } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 
 interface InfiniteCarouselProps {
   children: ReactNode[];
@@ -19,6 +17,8 @@ export default function InfiniteCarousel({
       className="overflow-hidden relative w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
     >
       {/* Fade edges */}
       <div className="pointer-events-none absolute inset-y-0 left-0 w-16 z-10 bg-gradient-to-r from-surface-900 to-transparent" />

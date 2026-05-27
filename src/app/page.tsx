@@ -53,7 +53,7 @@ export default function HomePage() {
   const carouselColleges = colleges.slice(0, 10);
 
   return (
-    <div className="max-w-7xl mx-auto pt-24 space-y-16">
+    <div className="max-w-7xl mx-auto pt-24 px-4 md:px-8 space-y-16">
       {/* ── Hero ── */}
       <section className="text-center space-y-6 animate-fadeUp">
         <h1 className="text-4xl md:text-6xl font-geist font-bold leading-tight">

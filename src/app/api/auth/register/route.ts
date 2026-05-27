@@ -33,11 +33,35 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name, email, passwordHash },
-      select: { id: true, name: true, email: true, createdAt: true },
+      data: {
+        name,
+        email,
+        passwordHash,
+        gpa: 3.8,
+        sat: 1450,
+        major: 'Computer Science',
+      },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    // Auto-seed demo college tracking for a new user so they have a guided onboarding experience
+    const mit = await prisma.college.findUnique({ where: { slug: 'mit' } });
+    const stanford = await prisma.college.findUnique({ where: { slug: 'stanford' } });
+    const caltech = await prisma.college.findUnique({ where: { slug: 'caltech' } });
+
+    if (mit && stanford && caltech) {
+      await prisma.savedCollege.createMany({
+        data: [
+          { userId: user.id, collegeId: mit.id, status: 'RESEARCHING' },
+          { userId: user.id, collegeId: stanford.id, status: 'IN_PROGRESS' },
+          { userId: user.id, collegeId: caltech.id, status: 'SUBMITTED' },
+        ],
+      });
+    }
+
+    return NextResponse.json(
+      { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt },
+      { status: 201 }
+    );
   } catch (err) {
     console.error('Registration error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

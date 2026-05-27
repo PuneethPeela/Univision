@@ -30,6 +30,7 @@ export default function SearchBar({
         viewBox="0 0 24 24"
         stroke="currentColor"
         strokeWidth={2}
+        aria-hidden="true"
       >
         <path
           strokeLinecap="round"
@@ -42,6 +43,7 @@ export default function SearchBar({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder}
         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-onSurface placeholder-muted text-sm focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_12px_rgba(0,244,254,0.1)] backdrop-blur-xl transition-all duration-200"
       />
     </div>

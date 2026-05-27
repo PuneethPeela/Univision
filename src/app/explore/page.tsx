@@ -32,7 +32,7 @@ export default function ExplorePage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
   const [sort, setSort] = useState('match');
-  const [cursor, setCursor] = useState<string | null>(null);
+  const cursorRef = useRef<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const observerRef = useRef<HTMLDivElement | null>(null);
@@ -58,7 +58,7 @@ export default function ExplorePage() {
         const data = await res.json();
         const newColleges: College[] = data.colleges || [];
         setColleges((prev) => (isReset ? newColleges : [...prev, ...newColleges]));
-        setCursor(data.nextCursor || null);
+        cursorRef.current = data.nextCursor || null;
         setHasMore(!!data.nextCursor);
       } catch {
         setHasMore(false);
@@ -71,7 +71,7 @@ export default function ExplorePage() {
 
   // Reset on filter/search/sort change
   useEffect(() => {
-    setCursor(null);
+    cursorRef.current = null;
     setHasMore(true);
     fetchColleges(null, true);
   }, [fetchColleges]);
@@ -84,13 +84,9 @@ export default function ExplorePage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          // Use functional state getter to access latest cursor
-          setCursor((currentCursor) => {
-            if (currentCursor) {
-              fetchColleges(currentCursor, false);
-            }
-            return currentCursor;
-          });
+          if (cursorRef.current) {
+            fetchColleges(cursorRef.current, false);
+          }
         }
       },
       { threshold: 0.1 }

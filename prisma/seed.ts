@@ -2,8 +2,9 @@ import { PrismaClient, CollegeType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -1088,6 +1089,79 @@ async function main() {
       create: college,
     });
     console.log('  ✓', college.name);
+  }
+
+  // Seed the Demo Scholar Account
+  console.log('👤 Seeding demo scholar account...');
+  const demoEmail = 'demo@example.com';
+  const demoHashed = await bcrypt.hash('demo123', 12);
+  
+  const user = await prisma.user.upsert({
+    where: { email: demoEmail },
+    update: {
+      name: 'Demo Scholar',
+      passwordHash: demoHashed,
+      gpa: 3.8,
+      sat: 1450,
+      major: 'Computer Science',
+    },
+    create: {
+      name: 'Demo Scholar',
+      email: demoEmail,
+      passwordHash: demoHashed,
+      gpa: 3.8,
+      sat: 1450,
+      major: 'Computer Science',
+    },
+  });
+
+  // Seed the Evaluator Admin Account
+  console.log('👤 Seeding evaluator admin account...');
+  const adminEmail = 'peelapuneeth@gmail.com';
+  const adminHashed = await bcrypt.hash('admin123', 12);
+
+  const adminUser = await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {
+      name: 'Evaluator Admin',
+      passwordHash: adminHashed,
+      gpa: 4.0,
+      sat: 1600,
+      major: 'Computer Science',
+    },
+    create: {
+      name: 'Evaluator Admin',
+      email: adminEmail,
+      passwordHash: adminHashed,
+      gpa: 4.0,
+      sat: 1600,
+      major: 'Computer Science',
+    },
+  });
+
+  // Get relevant seeded colleges to link
+  const mit = await prisma.college.findUnique({ where: { slug: 'mit' } });
+  const stanford = await prisma.college.findUnique({ where: { slug: 'stanford' } });
+  const caltech = await prisma.college.findUnique({ where: { slug: 'caltech' } });
+
+  if (mit && stanford && caltech) {
+    // Upsert Saved Colleges
+    await prisma.savedCollege.upsert({
+      where: { userId_collegeId: { userId: user.id, collegeId: mit.id } },
+      update: { status: 'RESEARCHING' },
+      create: { userId: user.id, collegeId: mit.id, status: 'RESEARCHING' },
+    });
+    await prisma.savedCollege.upsert({
+      where: { userId_collegeId: { userId: user.id, collegeId: stanford.id } },
+      update: { status: 'IN_PROGRESS' },
+      create: { userId: user.id, collegeId: stanford.id, status: 'IN_PROGRESS' },
+    });
+    await prisma.savedCollege.upsert({
+      where: { userId_collegeId: { userId: user.id, collegeId: caltech.id } },
+      update: { status: 'SUBMITTED' },
+      create: { userId: user.id, collegeId: caltech.id, status: 'SUBMITTED' },
+    });
+    console.log('  ✓ Linked demo applications (MIT, Stanford, Caltech)');
   }
 
   console.log('✅ Seed complete!');

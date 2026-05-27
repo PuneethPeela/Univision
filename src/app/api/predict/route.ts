@@ -7,7 +7,23 @@ const predictSchema = z.object({
   exam: z.enum(['SAT', 'ACT', 'JEE_MAIN', 'JEE_ADVANCED', 'GRE']),
   score: z.number().min(0),
   gpa: z.number().min(0).max(4.0),
-  major: z.string().min(1),
+  major: z.string().min(1).max(100),
+}).superRefine((val, ctx) => {
+  if (val.exam === 'SAT' && val.score > 1600) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'SAT score cannot exceed 1600' });
+  }
+  if (val.exam === 'ACT' && val.score > 36) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'ACT score cannot exceed 36' });
+  }
+  if (val.exam === 'GRE' && val.score > 340) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'GRE score cannot exceed 340' });
+  }
+  if (val.exam === 'JEE_MAIN' && val.score > 300) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Main score cannot exceed 300' });
+  }
+  if (val.exam === 'JEE_ADVANCED' && val.score > 100) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Advanced score cannot exceed 100' });
+  }
 });
 
 function actToSat(act: number): number {
