@@ -13,12 +13,14 @@ const userUpdateSchema = z.object({
   gpa: z.number().min(0).max(4.0).nullable().optional(),
   sat: z.number().min(400).max(1600).nullable().optional(),
   major: z.string().min(1).max(100).nullable().optional(),
+  role: z.enum(['USER', 'SUB_ADMIN', 'ADMIN']).optional(),
 });
 
-function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
+async function getRole(email: string | null | undefined): Promise<string> {
+  if (!email) return 'USER';
   const normalized = email.toLowerCase().trim();
-  return normalized === 'demo@example.com' || normalized === 'peelapuneeth@gmail.com';
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  return user?.role || 'USER';
 }
 
 export async function PATCH(
@@ -27,8 +29,13 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !isAdmin(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const currentRole = await getRole(session.user.email);
+    if (currentRole !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
     const params = await context.params;
@@ -62,6 +69,7 @@ export async function PATCH(
         gpa: true,
         sat: true,
         major: true,
+        role: true,
         createdAt: true,
       },
     });
@@ -79,8 +87,13 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !isAdmin(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const currentRole = await getRole(session.user.email);
+    if (currentRole !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
     const params = await context.params;

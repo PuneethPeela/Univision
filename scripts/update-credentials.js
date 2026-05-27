@@ -20,32 +20,34 @@ async function main() {
   const demoHash = await bcrypt.hash('demo123', 12);
   const adminHash = await bcrypt.hash('admin123', 12);
   
-  // 1. Update demo@example.com
+  // 1. Update demo@example.com (SUB_ADMIN)
   const demoUser = await prisma.user.upsert({
     where: { email: 'demo@example.com' },
-    update: { passwordHash: demoHash },
+    update: { passwordHash: demoHash, role: 'SUB_ADMIN' },
     create: {
       email: 'demo@example.com',
       name: 'Demo Scholar',
       passwordHash: demoHash,
       gpa: 3.8,
       sat: 1450,
-      major: 'Computer Science'
+      major: 'Computer Science',
+      role: 'SUB_ADMIN'
     }
   });
   console.log('Updated demo scholar user:', demoUser.email);
 
-  // 2. Update/Create peelapuneeth@gmail.com
+  // 2. Update/Create peelapuneeth@gmail.com (ADMIN)
   const adminUser = await prisma.user.upsert({
     where: { email: 'peelapuneeth@gmail.com' },
-    update: { passwordHash: adminHash },
+    update: { passwordHash: adminHash, role: 'ADMIN' },
     create: {
       email: 'peelapuneeth@gmail.com',
       name: 'Evaluator Admin',
       passwordHash: adminHash,
       gpa: 4.0,
       sat: 1600,
-      major: 'Computer Science'
+      major: 'Computer Science',
+      role: 'ADMIN'
     }
   });
   console.log('Updated evaluator admin user:', adminUser.email);

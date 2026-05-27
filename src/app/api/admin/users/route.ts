@@ -13,19 +13,26 @@ const userCreateSchema = z.object({
   gpa: z.number().min(0).max(4.0).nullable().optional(),
   sat: z.number().min(400).max(1600).nullable().optional(),
   major: z.string().min(1).max(100).nullable().optional(),
+  role: z.enum(['USER', 'SUB_ADMIN', 'ADMIN']).optional().default('USER'),
 });
 
-function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
+async function getRole(email: string | null | undefined): Promise<string> {
+  if (!email) return 'USER';
   const normalized = email.toLowerCase().trim();
-  return normalized === 'demo@example.com' || normalized === 'peelapuneeth@gmail.com';
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  return user?.role || 'USER';
 }
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !isAdmin(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const role = await getRole(session.user.email);
+    if (role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
     const users = await prisma.user.findMany({
@@ -36,6 +43,7 @@ export async function GET() {
         gpa: true,
         sat: true,
         major: true,
+        role: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -51,8 +59,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !isAdmin(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const role = await getRole(session.user.email);
+    if (role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -61,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { name, email, password, gpa, sat, major } = parsed.data;
+    const { name, email, password, gpa, sat, major, role: targetRole } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -78,6 +91,7 @@ export async function POST(req: NextRequest) {
         gpa: gpa ?? 3.8,
         sat: sat ?? 1450,
         major: major ?? 'Computer Science',
+        role: targetRole,
       },
       select: {
         id: true,
@@ -86,6 +100,7 @@ export async function POST(req: NextRequest) {
         gpa: true,
         sat: true,
         major: true,
+        role: true,
         createdAt: true,
       },
     });

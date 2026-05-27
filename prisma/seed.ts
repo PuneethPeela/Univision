@@ -1104,6 +1104,7 @@ async function main() {
       gpa: 3.8,
       sat: 1450,
       major: 'Computer Science',
+      role: 'SUB_ADMIN',
     },
     create: {
       name: 'Demo Scholar',
@@ -1112,6 +1113,7 @@ async function main() {
       gpa: 3.8,
       sat: 1450,
       major: 'Computer Science',
+      role: 'SUB_ADMIN',
     },
   });
 
@@ -1128,6 +1130,7 @@ async function main() {
       gpa: 4.0,
       sat: 1600,
       major: 'Computer Science',
+      role: 'ADMIN',
     },
     create: {
       name: 'Evaluator Admin',
@@ -1136,6 +1139,7 @@ async function main() {
       gpa: 4.0,
       sat: 1600,
       major: 'Computer Science',
+      role: 'ADMIN',
     },
   });
 

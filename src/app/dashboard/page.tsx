@@ -79,9 +79,15 @@ function DashboardContent() {
   const [gpa, setGpa] = useState('3.8');
   const [sat, setSat] = useState('1450');
   const [major, setMajor] = useState('Computer Science');
+  const [userRole, setUserRole] = useState<'USER' | 'SUB_ADMIN' | 'ADMIN'>('USER');
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
+
+  // Candidate Inspector states (For Admins and Sub-Admins)
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>('');
+  const [loadingCandidate, setLoadingCandidate] = useState(false);
 
   // Password rotation fields
   const [currentPassword, setCurrentPassword] = useState('');
@@ -118,11 +124,13 @@ function DashboardContent() {
     gpa: '3.8',
     sat: '1450',
     major: 'Computer Science',
+    role: 'USER' as 'USER' | 'SUB_ADMIN' | 'ADMIN',
   });
   const [userModalError, setUserModalError] = useState('');
   const [userModalSuccess, setUserModalSuccess] = useState('');
 
-  const isAdminUser = session?.user?.email?.toLowerCase().trim() === 'demo@example.com' || session?.user?.email?.toLowerCase().trim() === 'peelapuneeth@gmail.com';
+  const isAdminUser = userRole === 'ADMIN';
+  const isSubAdmin = userRole === 'SUB_ADMIN';
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
@@ -146,6 +154,7 @@ function DashboardContent() {
         setGpa(data.gpa != null ? String(data.gpa) : '');
         setSat(data.sat != null ? String(data.sat) : '');
         setMajor(data.major || '');
+        setUserRole((data.role || 'USER') as any);
       }
     } catch {}
     setLoadingProfile(false);
@@ -177,18 +186,43 @@ function DashboardContent() {
     setLoadingUsers(false);
   }, []);
 
+  // Fetch Candidates list (Admins & Sub-Admins only)
+  const fetchCandidates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/candidates');
+      if (res.ok) {
+        const data = await res.json();
+        setCandidates(data.candidates || []);
+      }
+    } catch {}
+  }, []);
+
+  // Fetch specific candidate's entire data model
+  const loadCandidateData = useCallback(async (candidateId: string) => {
+    if (!candidateId) return;
+    setLoadingCandidate(true);
+    try {
+      const res = await fetch(`/api/admin/candidates/${candidateId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(data.savedColleges || []);
+        setProfileName(data.candidate.name || '');
+        setGpa(data.candidate.gpa != null ? String(data.candidate.gpa) : '');
+        setSat(data.candidate.sat != null ? String(data.candidate.sat) : '');
+        setMajor(data.candidate.major || '');
+        setComparisons(data.savedComparisons || []);
+      }
+    } catch {}
+    setLoadingCandidate(false);
+  }, []);
+
+  // Client-side guard for protected tabs and loading orchestrations
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth');
     } else if (status === 'authenticated') {
-      fetchApplications();
       fetchProfile();
-
-      if (activeTab === 'comparisons') {
-        fetchComparisons();
-      } else if (activeTab === 'admin' && isAdminUser) {
-        fetchAdminUsers();
-      }
+      fetchApplications();
 
       const localMfa = localStorage.getItem('settings_mfa') === 'true';
       const localAlerts = localStorage.getItem('settings_alerts') !== 'false';
@@ -197,7 +231,34 @@ function DashboardContent() {
       setAlertsEnabled(localAlerts);
       setDigestEnabled(localDigest);
     }
-  }, [status, router, activeTab, fetchApplications, fetchProfile, fetchComparisons, fetchAdminUsers, isAdminUser]);
+  }, [status, router, fetchProfile, fetchApplications]);
+
+  // Load contextual active tab details & check candidate inspection permission triggers
+  useEffect(() => {
+    if (status === 'authenticated' && !loadingProfile) {
+      // Guard tabs
+      if (activeTab === 'admin' && userRole !== 'ADMIN') {
+        router.push('/dashboard?tab=overview');
+        return;
+      }
+      if (activeTab === 'settings' && userRole === 'SUB_ADMIN') {
+        router.push('/dashboard?tab=overview');
+        return;
+      }
+
+      // Load dropdown selection candidates list
+      if (userRole === 'ADMIN' || userRole === 'SUB_ADMIN') {
+        fetchCandidates();
+      }
+
+      // Load tabs data
+      if (activeTab === 'comparisons' && !selectedCandidateId) {
+        fetchComparisons();
+      } else if (activeTab === 'admin' && userRole === 'ADMIN') {
+        fetchAdminUsers();
+      }
+    }
+  }, [status, loadingProfile, activeTab, userRole, selectedCandidateId, fetchCandidates, fetchComparisons, fetchAdminUsers, router]);
 
   // Milestones loading
   useEffect(() => {
@@ -224,16 +285,31 @@ function DashboardContent() {
 
   const handleStatusChange = async (id: string, newStatus: SavedCollege['status']) => {
     try {
-      const res = await fetch(`/api/saved/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setApplications((prev) =>
-          prev.map((app) => (app.id === id ? { ...app, status: updated.status } : app))
-        );
+      if (selectedCandidateId) {
+        // Update candidate application status
+        const res = await fetch(`/api/admin/candidates/${selectedCandidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ savedCollegeId: id, status: newStatus }),
+        });
+        if (res.ok) {
+          setApplications((prev) =>
+            prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
+          );
+        }
+      } else {
+        // Update own status
+        const res = await fetch(`/api/saved/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setApplications((prev) =>
+            prev.map((app) => (app.id === id ? { ...app, status: updated.status } : app))
+          );
+        }
       }
     } catch {}
   };
@@ -257,24 +333,45 @@ function DashboardContent() {
     setSavingProfile(true);
     setProfileSuccess('');
     try {
-      const res = await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profileName || null,
-          gpa: gpa ? parseFloat(gpa) : null,
-          sat: sat ? parseInt(sat, 10) : null,
-          major: major || null,
-        }),
-      });
-
-      if (res.ok) {
-        setProfileSuccess('Academic Profile updated successfully.');
-        await updateSession();
-        router.refresh();
+      if (selectedCandidateId) {
+        // Update selected candidate academic profile
+        const res = await fetch(`/api/admin/candidates/${selectedCandidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: profileName || null,
+            gpa: gpa ? parseFloat(gpa) : null,
+            sat: sat ? parseInt(sat, 10) : null,
+            major: major || null,
+          }),
+        });
+        if (res.ok) {
+          setProfileSuccess("Candidate's Academic Profile updated successfully!");
+        } else {
+          const err = await res.json();
+          setProfileSuccess(err.error || 'Failed to update candidate profile.');
+        }
       } else {
-        const err = await res.json();
-        setProfileSuccess(err.error || 'Failed to update academic profile.');
+        // Update own profile
+        const res = await fetch('/api/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: profileName || null,
+            gpa: gpa ? parseFloat(gpa) : null,
+            sat: sat ? parseInt(sat, 10) : null,
+            major: major || null,
+          }),
+        });
+
+        if (res.ok) {
+          setProfileSuccess('Academic Profile updated successfully.');
+          await updateSession();
+          router.refresh();
+        } else {
+          const err = await res.json();
+          setProfileSuccess(err.error || 'Failed to update academic profile.');
+        }
       }
     } catch {
       setProfileSuccess('Error saving profile changes.');
@@ -354,6 +451,7 @@ function DashboardContent() {
       gpa: '3.8',
       sat: '1450',
       major: 'Computer Science',
+      role: 'USER',
     });
     setUserModalError('');
     setUserModalSuccess('');
@@ -370,6 +468,7 @@ function DashboardContent() {
       gpa: u.gpa != null ? String(u.gpa) : '',
       sat: u.sat != null ? String(u.sat) : '',
       major: u.major || '',
+      role: u.role || 'USER',
     });
     setUserModalError('');
     setUserModalSuccess('');
@@ -387,6 +486,7 @@ function DashboardContent() {
       sat: userForm.sat ? parseInt(userForm.sat, 10) : null,
       major: userForm.major || null,
       password: userForm.password || undefined,
+      role: userForm.role,
     };
 
     try {
@@ -509,13 +609,16 @@ function DashboardContent() {
     );
   }
 
+  const showAdminConsole = userRole === 'ADMIN';
+  const showSettings = userRole === 'ADMIN' || userRole === 'USER';
+
   const cockpitTabs = [
     { id: 'overview', label: '📊 Cockpit Overview' },
     { id: 'tracker', label: '📋 Application Tracker' },
     { id: 'profile', label: '👤 Academic Profile' },
     { id: 'comparisons', label: '💾 Saved Comparisons' },
-    ...(isAdminUser ? [{ id: 'admin', label: '🛡️ Admin User Console' }] : []),
-    { id: 'settings', label: '⚙️ System Settings' },
+    ...(showAdminConsole ? [{ id: 'admin', label: '🛡️ Admin User Console' }] : []),
+    ...(showSettings ? [{ id: 'settings', label: '⚙️ System Settings' }] : []),
   ];
 
   const filteredUsers = adminUsers.filter(
@@ -547,6 +650,49 @@ function DashboardContent() {
           🚪 Sign Out
         </button>
       </div>
+
+      {/* Dynamic Candidate Inspector Dropdown for Admins / Sub-Admins */}
+      {(userRole === 'ADMIN' || userRole === 'SUB_ADMIN') && (
+        <div className="glass p-4 border border-cyan/20 bg-cyan/5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeUp shadow-[0_0_24px_rgba(0,244,254,0.03)]">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan animate-pulse shadow-[0_0_8px_rgba(0,244,254,0.8)]" />
+            <div>
+              <span className="text-[10px] text-cyan uppercase font-bold tracking-wider block">Candidate Inspector Engine</span>
+              <span className="text-xs text-onSurface font-semibold">
+                {selectedCandidateId 
+                  ? `Active Session: Inspecting and managing data for user ${profileName}` 
+                  : `Active Session: Managing your own evaluator credentials (${userRole})`}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-bold whitespace-nowrap">Select Student:</span>
+            <select
+              value={selectedCandidateId}
+              onChange={(e) => {
+                const cid = e.target.value;
+                setSelectedCandidateId(cid);
+                if (cid) {
+                  loadCandidateData(cid);
+                } else {
+                  // Reload own profile data
+                  fetchProfile();
+                  fetchApplications();
+                  fetchComparisons();
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg bg-surface-900 border border-cyan/30 text-xs text-cyan font-bold focus:outline-none focus:border-cyan cursor-pointer w-full sm:w-64"
+            >
+              <option value="">💼 Evaluator Mode (Self)</option>
+              {candidates.map((c) => (
+                <option key={c.id} value={c.id}>
+                  🎓 {c.name || 'Anonymous'} ({c.email})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1603,6 +1749,20 @@ function DashboardContent() {
                     placeholder={modalMode === 'create' ? '••••••••' : 'Leave blank to keep unchanged'}
                     className="w-full px-3.5 py-2 rounded-lg bg-surface-900 border border-white/10 text-onSurface text-xs placeholder-muted focus:outline-none focus:border-cyan/50"
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="modal-user-role" className="text-[9px] text-muted uppercase tracking-wider block mb-1 font-bold">System Privilege Role</label>
+                  <select
+                    id="modal-user-role"
+                    value={userForm.role}
+                    onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as any }))}
+                    className="w-full px-3 py-2 rounded-lg bg-surface-900 border border-white/10 text-onSurface text-xs focus:outline-none focus:border-cyan/50 cursor-pointer font-bold text-cyan"
+                  >
+                    <option value="USER">🎓 Standard Candidate Student</option>
+                    <option value="SUB_ADMIN">🔬 Admissions Sub-Admin Partner</option>
+                    <option value="ADMIN">🛡️ Super Administrator</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">

@@ -28,6 +28,7 @@ export async function GET() {
         gpa: true,
         sat: true,
         major: true,
+        role: true,
       },
     });
 
@@ -65,6 +66,7 @@ export async function PATCH(req: NextRequest) {
         gpa: true,
         sat: true,
         major: true,
+        role: true,
       },
     });
 
