@@ -530,11 +530,17 @@ function DashboardContent() {
       if (res.ok) {
         setAdminUsers((prev) => prev.filter((u) => u.id !== id));
       } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete user.');
+        let errorMessage = 'Failed to delete user.';
+        try {
+          const data = await res.json();
+          errorMessage = data.error || errorMessage;
+        } catch {
+          errorMessage = `Server returned error status ${res.status}: ${res.statusText || 'Not Found'}`;
+        }
+        alert(errorMessage);
       }
-    } catch {
-      alert('Error occurred during user deletion.');
+    } catch (err) {
+      alert(`Network error occurred during user deletion: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
