@@ -25,7 +25,7 @@ async function getRole(email: string | null | undefined): Promise<string> {
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: Promise<any> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -38,8 +38,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
-    const params = await context.params;
-    const { id } = params;
+    const { id } = await params;
     
     if (!id) {
       return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
@@ -83,7 +82,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: Promise<any> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -96,8 +95,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
-    const params = await context.params;
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
@@ -113,15 +111,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Secure database transactional manual cascade delete
-    await prisma.$transaction([
-      prisma.savedCollege.deleteMany({ where: { userId: id } }),
-      prisma.savedComparison.deleteMany({ where: { userId: id } }),
-      prisma.review.deleteMany({ where: { userId: id } }),
-      prisma.answer.deleteMany({ where: { userId: id } }),
-      prisma.discussion.deleteMany({ where: { userId: id } }),
-      prisma.user.delete({ where: { id } }),
-    ]);
+    // Fetch discussions created by target user
+    const userDiscussions = await prisma.discussion.findMany({
+      where: { userId: id },
+      select: { id: true },
+    });
+    const userDiscussionIds = userDiscussions.map((d) => d.id);
+
+    // Secure database transactional manual cascade delete with child answer cleanups
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete all answers belonging to discussions created by this user
+      if (userDiscussionIds.length > 0) {
+        await tx.answer.deleteMany({
+          where: { discussionId: { in: userDiscussionIds } },
+        });
+      }
+
+      // 2. Delete all other dependent records
+      await tx.savedCollege.deleteMany({ where: { userId: id } });
+      await tx.savedComparison.deleteMany({ where: { userId: id } });
+      await tx.review.deleteMany({ where: { userId: id } });
+      await tx.answer.deleteMany({ where: { userId: id } }); // answers written by this user on other threads
+      await tx.discussion.deleteMany({ where: { userId: id } });
+      
+      // 3. Finally delete the user
+      await tx.user.delete({ where: { id } });
+    });
 
     return NextResponse.json({ message: 'User and all associated records deleted successfully' });
   } catch (err) {

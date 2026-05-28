@@ -24,7 +24,7 @@ async function getRole(email: string | null | undefined): Promise<string> {
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<any> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -37,8 +37,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden: Admin or Sub-Admin access required' }, { status: 403 });
     }
 
-    const params = await context.params;
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing candidate ID' }, { status: 400 });
@@ -101,7 +100,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: Promise<any> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -114,8 +113,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden: Admin or Sub-Admin access required' }, { status: 403 });
     }
 
-    const params = await context.params;
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing candidate ID' }, { status: 400 });
