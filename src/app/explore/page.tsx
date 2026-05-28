@@ -156,10 +156,29 @@ export default function ExplorePage() {
       {(loading || loadingMore) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(loading ? 6 : 3)].map((_, i) => (
-            <div key={i} className="glass p-5 animate-pulse h-52 rounded-xl" />
+            <div key={i} className="glass p-5 flex flex-col gap-4 animate-pulse rounded-xl h-52">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2 flex-1">
+                  <div className="h-5 bg-white/10 rounded w-2/3" />
+                  <div className="h-4 bg-white/5 rounded w-1/2" />
+                </div>
+                <div className="w-12 h-12 rounded-full bg-white/10" />
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-white/5" />
+              <div className="flex gap-2">
+                <div className="h-4 bg-white/10 rounded w-16" />
+                <div className="h-4 bg-white/5 rounded w-10" />
+                <div className="h-4 bg-white/5 rounded w-12" />
+              </div>
+              <div className="space-y-1.5 pt-1">
+                <div className="h-3 bg-white/5 rounded w-full" />
+                <div className="h-3 bg-white/5 rounded w-5/6" />
+              </div>
+            </div>
           ))}
         </div>
       )}
+
 
       {/* Infinite scroll trigger */}
       <div ref={observerRef} className="h-4" />
