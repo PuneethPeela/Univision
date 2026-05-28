@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { assertBodySize } from '@/lib/security';
 
 const updateStatusSchema = z.object({
   status: z.enum(['RESEARCHING', 'IN_PROGRESS', 'SUBMITTED', 'ACCEPTED', 'REJECTED']),
@@ -21,6 +22,12 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 1024);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
 
     const parsed = updateStatusSchema.safeParse(body);
     if (!parsed.success) {

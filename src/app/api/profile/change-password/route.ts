@@ -5,10 +5,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { assertBodySize, validatePasswordStrength } from '@/lib/security';
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+  newPassword: z.string(),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,12 +20,28 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 2048);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = passwordChangeSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
     const { currentPassword, newPassword } = parsed.data;
+
+    // Validate new password strength
+    const passwordCheck = validatePasswordStrength(newPassword);
+    if (!passwordCheck.valid) {
+      return NextResponse.json(
+        { error: { newPassword: [passwordCheck.message || 'Weak password'] } },
+        { status: 400 }
+      );
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },

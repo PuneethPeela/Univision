@@ -2,27 +2,30 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { assertBodySize } from '@/lib/security';
 
-const predictSchema = z.object({
+export const predictSchema = z.object({
   exam: z.enum(['SAT', 'ACT', 'JEE_MAIN', 'JEE_ADVANCED', 'GRE']),
   score: z.number().min(0),
   gpa: z.number().min(0).max(4.0),
   major: z.string().min(1).max(100),
 }).superRefine((val, ctx) => {
-  if (val.exam === 'SAT' && val.score > 1600) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'SAT score cannot exceed 1600' });
+  if (val.exam === 'SAT' && (val.score > 1600 || val.score < 400)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'SAT score must be between 400 and 1600' });
   }
-  if (val.exam === 'ACT' && val.score > 36) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'ACT score cannot exceed 36' });
+  if (val.exam === 'ACT' && (val.score > 36 || val.score < 1)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'ACT score must be between 1 and 36' });
   }
-  if (val.exam === 'GRE' && val.score > 340) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'GRE score cannot exceed 340' });
+  if (val.exam === 'GRE' && (val.score > 340 || val.score < 260)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'GRE score must be between 260 and 340' });
   }
-  if (val.exam === 'JEE_MAIN' && val.score > 300) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Main score cannot exceed 300' });
+  if (val.exam === 'JEE_MAIN' && (val.score > 300 || val.score < 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Main score must be between 0 and 300' });
   }
-  if (val.exam === 'JEE_ADVANCED' && val.score > 100) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Advanced score cannot exceed 100' });
+  if (val.exam === 'JEE_ADVANCED' && (val.score > 100 || val.score < 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['score'], message: 'JEE Advanced score must be between 0 and 100' });
   }
 });
 
@@ -32,7 +35,19 @@ function actToSat(act: number): number {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 2048);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = predictSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

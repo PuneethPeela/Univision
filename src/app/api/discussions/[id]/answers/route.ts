@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { assertBodySize } from '@/lib/security';
 
 const answerSchema = z.object({
   body: z.string().min(5).max(5000),
@@ -21,6 +22,13 @@ export async function POST(
 
     const { id } = await params;
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 16384);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = answerSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

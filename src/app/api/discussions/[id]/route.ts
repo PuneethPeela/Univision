@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { assertBodySize } from '@/lib/security';
 
 const updateSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(200),
@@ -51,6 +52,12 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 16384);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
 
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {

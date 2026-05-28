@@ -5,9 +5,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { resolveRole, validatePasswordStrength, sanitizeText } from '@/lib/security';
+import { resolveRole, validatePasswordStrength, sanitizeText, assertBodySize } from '@/lib/security';
 
-const userUpdateSchema = z.object({
+export const userUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
   email: z.string().email('Invalid email').max(150).optional(),
   password: z.string().optional().nullable(),
@@ -39,6 +39,13 @@ export async function PATCH(
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 5120);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = userUpdateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

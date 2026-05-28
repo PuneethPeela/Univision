@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { assertBodySize } from '@/lib/security';
 
 const createSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(200),
@@ -60,8 +61,8 @@ export async function GET(req: NextRequest) {
 
     const orderBy =
       sort === 'popular'
-        ? { upvotes: 'desc' as const }
-        : { createdAt: 'desc' as const };
+         ? { upvotes: 'desc' as const }
+         : { createdAt: 'desc' as const };
 
     // Cursor-based pagination — efficient on large tables, no skip degradation
     const discussions = await prisma.discussion.findMany({
@@ -99,6 +100,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 16384);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

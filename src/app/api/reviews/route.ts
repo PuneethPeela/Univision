@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { assertBodySize } from '@/lib/security';
 
 const reviewSchema = z.object({
   collegeId: z.string().min(1),
@@ -59,6 +60,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 8192);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = reviewSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

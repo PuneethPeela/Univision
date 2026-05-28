@@ -5,9 +5,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { resolveRole, validatePasswordStrength, sanitizeText } from '@/lib/security';
+import { resolveRole, validatePasswordStrength, sanitizeText, assertBodySize } from '@/lib/security';
 
-const userCreateSchema = z.object({
+export const userCreateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().email('Invalid email').max(150),
   password: z.string(),
@@ -17,7 +17,7 @@ const userCreateSchema = z.object({
   role: z.enum(['USER', 'SUB_ADMIN', 'ADMIN']).optional().default('USER'),
 });
 
-const listQuerySchema = z.object({
+export const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   q: z.string().max(100).optional().default(''),
@@ -99,6 +99,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 5120);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = userCreateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

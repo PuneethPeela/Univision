@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { assertBodySize } from '@/lib/security';
 
 const comparisonSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    try {
+      assertBodySize(body, 2048);
+    } catch (sizeErr: any) {
+      return NextResponse.json({ error: sizeErr.message }, { status: 413 });
+    }
+
     const parsed = comparisonSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
