@@ -12,6 +12,14 @@ enum CollegeType {
   SAFETY
 }
 
+enum ApplicationStatus {
+  RESEARCHING
+  IN_PROGRESS
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
 model College {
   id               String   @id @default(cuid())
   name             String
@@ -44,6 +52,10 @@ model College {
   reviews          Review[]
   savedBy          SavedCollege[]
   discussions      Discussion[]
+
+  @@index([type])
+  @@index([name, state])
+  @@index([matchScore])
 }
 
 model User {
@@ -58,30 +70,36 @@ model User {
   role         String   @default("USER")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  savedColleges SavedCollege[]
-  discussions  Discussion[]
-  answers      Answer[]
-  reviews      Review[]
+  savedColleges    SavedCollege[]
+  discussions      Discussion[]
+  answers          Answer[]
+  reviews          Review[]
   savedComparisons SavedComparison[]
+
+  @@index([role])
+  @@index([email])
 }
 
 model SavedCollege {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
+  id        String          @id @default(cuid())
+  user      User            @relation(fields: [userId], references: [id])
   userId    String
-  college   College  @relation(fields: [collegeId], references: [id])
+  college   College         @relation(fields: [collegeId], references: [id])
   collegeId String
-  status    String   @default("RESEARCHING")
-  createdAt DateTime @default(now())
+  status    ApplicationStatus @default(RESEARCHING)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
 
   @@unique([userId, collegeId])
   @@index([collegeId])
+  @@index([userId, status])
 }
 
 model Discussion {
   id        String   @id @default(cuid())
   title     String
   body      String
+  isEdited  Boolean  @default(false)
   user      User     @relation(fields: [userId], references: [id])
   userId    String
   college   College? @relation(fields: [collegeId], references: [id])
@@ -99,19 +117,21 @@ model Discussion {
 }
 
 model Answer {
-  id        String   @id @default(cuid())
-  body      String
-  discussion Discussion @relation(fields: [discussionId], references: [id])
+  id           String     @id @default(cuid())
+  body         String
+  isEdited     Boolean    @default(false)
+  discussion   Discussion @relation(fields: [discussionId], references: [id])
   discussionId String
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  upvotes   Int      @default(0)
-  isAccepted Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user         User       @relation(fields: [userId], references: [id])
+  userId       String
+  upvotes      Int        @default(0)
+  isAccepted   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
   @@index([discussionId])
   @@index([userId])
+  @@index([isAccepted])
 }
 
 model Review {
@@ -125,7 +145,7 @@ model Review {
   collegeId String
   createdAt DateTime @default(now())
 
-  @@index([collegeId])
+  @@index([collegeId, createdAt])
   @@index([userId])
 }
 

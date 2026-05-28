@@ -27,7 +27,6 @@ const predictSchema = z.object({
 });
 
 function actToSat(act: number): number {
-  // Approximate ACT-to-SAT concordance
   return Math.round(act * 40 - 80);
 }
 
@@ -45,14 +44,28 @@ export async function POST(req: NextRequest) {
     let satScore = score;
     if (exam === 'ACT') satScore = actToSat(score);
     if (exam === 'GRE') satScore = Math.round((score / 340) * 1600);
-    if (exam === 'JEE_MAIN') satScore = Math.round(1600 - (score / 300) * 400); // rank-ish
+    if (exam === 'JEE_MAIN') satScore = Math.round(1600 - (score / 300) * 400);
     if (exam === 'JEE_ADVANCED') satScore = Math.round(1600 - (score / 100) * 200);
 
-    const colleges = await prisma.college.findMany();
+    // Lean select — only the 11 fields the algorithm needs, not all 30+ DB columns
+    const colleges = await prisma.college.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        location: true,
+        type: true,
+        sat: true,
+        gpa: true,
+        majors: true,
+        acceptanceRate: true,
+        fees: true,
+        rating: true,
+      },
+    });
 
     const results = colleges
       .map((c) => {
-        // Distance scoring
         const satDist = c.sat ? Math.abs(satScore - c.sat) / 1600 : 0.5;
         const gpaDist = c.gpa ? Math.abs(gpa - c.gpa) / 4.0 : 0.5;
         const majorBonus = c.majors.some((m) =>

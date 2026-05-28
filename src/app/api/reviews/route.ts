@@ -12,21 +12,39 @@ const reviewSchema = z.object({
   body: z.string().min(10).max(2000),
 });
 
+const reviewsQuerySchema = z.object({
+  collegeId: z.string().min(1),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const collegeId = searchParams.get('collegeId');
-    if (!collegeId) {
-      return NextResponse.json({ error: 'collegeId required' }, { status: 400 });
-    }
-
-    const reviews = await prisma.review.findMany({
-      where: { collegeId },
-      include: { user: { select: { id: true, name: true, image: true } } },
-      orderBy: { createdAt: 'desc' },
+    const parsed = reviewsQuerySchema.safeParse({
+      collegeId: searchParams.get('collegeId') || undefined,
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
     });
 
-    return NextResponse.json({ reviews });
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { collegeId, page, limit } = parsed.data;
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where: { collegeId },
+        include: { user: { select: { id: true, name: true, image: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.review.count({ where: { collegeId } }),
+    ]);
+
+    return NextResponse.json({ reviews, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('Reviews list error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

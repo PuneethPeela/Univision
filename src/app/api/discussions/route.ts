@@ -13,20 +13,22 @@ const createSchema = z.object({
 });
 
 const discussionsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(10000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
   sort: z.enum(['recent', 'popular', 'unanswered']).default('recent'),
   q: z.string().max(100).optional().default(''),
+  cursor: z.string().optional(),
+  collegeId: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const paramsObj = {
-      page: url.searchParams.get('page') || undefined,
       limit: url.searchParams.get('limit') || undefined,
       sort: url.searchParams.get('sort') || undefined,
       q: url.searchParams.get('q') || undefined,
+      cursor: url.searchParams.get('cursor') || undefined,
+      collegeId: url.searchParams.get('collegeId') || undefined,
     };
 
     const parsed = discussionsQuerySchema.safeParse(paramsObj);
@@ -34,15 +36,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { page, limit, sort, q } = parsed.data;
+    const { limit, sort, q, cursor, collegeId } = parsed.data;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
+
     if (q) {
       where.OR = [
         { title: { contains: q, mode: 'insensitive' } },
         { body: { contains: q, mode: 'insensitive' } },
+        { tags: { has: q } },
       ];
+    }
+
+    if (collegeId) {
+      where.collegeId = collegeId;
+    }
+
+    // For "unanswered", add the filter to the query
+    if (sort === 'unanswered') {
+      where.answers = { none: {} };
     }
 
     const orderBy =
@@ -50,25 +63,28 @@ export async function GET(req: NextRequest) {
         ? { upvotes: 'desc' as const }
         : { createdAt: 'desc' as const };
 
-    // For "unanswered", add the filter to the query
-    const fullWhere = sort === 'unanswered' ? { ...where, answers: { none: {} } } : where;
+    // Cursor-based pagination — efficient on large tables, no skip degradation
+    const discussions = await prisma.discussion.findMany({
+      where,
+      orderBy,
+      take: limit + 1,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      include: {
+        user: { select: { id: true, name: true, image: true } },
+        _count: { select: { answers: true } },
+      },
+    });
 
-    const [discussions, total] = await Promise.all([
-      prisma.discussion.findMany({
-        where: fullWhere,
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          user: { select: { id: true, name: true, image: true } },
-          _count: { select: { answers: true } },
-        },
-      }),
-      // Use the same fullWhere for count to match the actual query
-      prisma.discussion.count({ where: fullWhere }),
-    ]);
+    let nextCursor: string | null = null;
+    if (discussions.length > limit) {
+      const last = discussions.pop();
+      nextCursor = last!.id;
+    }
 
-    return NextResponse.json({ discussions, total, page, limit });
+    // Total count for the current filter (for display purposes)
+    const total = await prisma.discussion.count({ where });
+
+    return NextResponse.json({ discussions, nextCursor, total });
   } catch (err) {
     console.error('Discussions list error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

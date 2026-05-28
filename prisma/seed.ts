@@ -1079,6 +1079,7 @@ const colleges: CollegeSeed[] = [
   },
 ];
 
+
 async function main() {
   console.log('🌱 Seeding database with', colleges.length, 'colleges...');
 
@@ -1091,12 +1092,12 @@ async function main() {
     console.log('  ✓', college.name);
   }
 
-  // Seed the Demo Scholar Account
+  // ─── Seed the Demo Scholar Account ───────────────────────────────────────
   console.log('👤 Seeding demo scholar account...');
   const demoEmail = 'demo@example.com';
   const demoHashed = await bcrypt.hash('demo123', 12);
-  
-  const user = await prisma.user.upsert({
+
+  const demoUser = await prisma.user.upsert({
     where: { email: demoEmail },
     update: {
       name: 'Demo Scholar',
@@ -1117,12 +1118,12 @@ async function main() {
     },
   });
 
-  // Seed the Evaluator Admin Account
+  // ─── Seed the Evaluator Admin Account ────────────────────────────────────
   console.log('👤 Seeding evaluator admin account...');
   const adminEmail = 'peelapuneeth@gmail.com';
   const adminHashed = await bcrypt.hash('admin123', 12);
 
-  const adminUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       name: 'Evaluator Admin',
@@ -1143,32 +1144,469 @@ async function main() {
     },
   });
 
-  // Get relevant seeded colleges to link
-  const mit = await prisma.college.findUnique({ where: { slug: 'mit' } });
-  const stanford = await prisma.college.findUnique({ where: { slug: 'stanford' } });
-  const caltech = await prisma.college.findUnique({ where: { slug: 'caltech' } });
+  // ─── Seed 5 Extra Realistic Candidate Users ──────────────────────────────
+  console.log('👥 Seeding candidate users...');
 
-  if (mit && stanford && caltech) {
-    // Upsert Saved Colleges
-    await prisma.savedCollege.upsert({
-      where: { userId_collegeId: { userId: user.id, collegeId: mit.id } },
-      update: { status: 'RESEARCHING' },
-      create: { userId: user.id, collegeId: mit.id, status: 'RESEARCHING' },
-    });
-    await prisma.savedCollege.upsert({
-      where: { userId_collegeId: { userId: user.id, collegeId: stanford.id } },
-      update: { status: 'IN_PROGRESS' },
-      create: { userId: user.id, collegeId: stanford.id, status: 'IN_PROGRESS' },
-    });
-    await prisma.savedCollege.upsert({
-      where: { userId_collegeId: { userId: user.id, collegeId: caltech.id } },
-      update: { status: 'SUBMITTED' },
-      create: { userId: user.id, collegeId: caltech.id, status: 'SUBMITTED' },
-    });
-    console.log('  ✓ Linked demo applications (MIT, Stanford, Caltech)');
+  const candidateProfiles = [
+    { name: 'Aisha Patel',    email: 'aisha.patel@example.com',    gpa: 3.92, sat: 1520, major: 'Biomedical Engineering' },
+    { name: 'Marcus Chen',    email: 'marcus.chen@example.com',    gpa: 3.75, sat: 1480, major: 'AI/ML' },
+    { name: 'Sofia Rosario',  email: 'sofia.rosario@example.com',  gpa: 3.60, sat: 1380, major: 'Economics' },
+    { name: 'Ethan Williams', email: 'ethan.williams@example.com', gpa: 4.00, sat: 1590, major: 'Physics' },
+    { name: 'Priya Nair',     email: 'priya.nair@example.com',     gpa: 3.45, sat: 1310, major: 'Environmental Science' },
+  ];
+
+  const candidateUsers = await Promise.all(
+    candidateProfiles.map((p) =>
+      prisma.user.upsert({
+        where: { email: p.email },
+        update: { name: p.name, gpa: p.gpa, sat: p.sat, major: p.major, role: 'USER' },
+        create: {
+          name: p.name,
+          email: p.email,
+          passwordHash: demoHashed, // same hash for easy testing
+          gpa: p.gpa,
+          sat: p.sat,
+          major: p.major,
+          role: 'USER',
+        },
+      })
+    )
+  );
+  console.log('  ✓ Seeded', candidateUsers.length, 'candidate users');
+
+  // ─── Fetch Colleges for Seeding Relations ─────────────────────────────────
+  const [mit, stanford, caltech, cmu, harvard, ucBerkeley, cornell, princeton] =
+    await Promise.all([
+      prisma.college.findUnique({ where: { slug: 'mit' } }),
+      prisma.college.findUnique({ where: { slug: 'stanford' } }),
+      prisma.college.findUnique({ where: { slug: 'caltech' } }),
+      prisma.college.findUnique({ where: { slug: 'cmu' } }),
+      prisma.college.findUnique({ where: { slug: 'harvard' } }),
+      prisma.college.findUnique({ where: { slug: 'uc-berkeley' } }),
+      prisma.college.findUnique({ where: { slug: 'cornell' } }),
+      prisma.college.findUnique({ where: { slug: 'princeton' } }),
+    ]);
+
+  // ─── Demo User Application Tracker (Varied Statuses) ─────────────────────
+  if (mit && stanford && caltech && cmu && harvard && ucBerkeley) {
+    const trackedApps = [
+      { college: mit,         status: 'SUBMITTED'   as const },
+      { college: stanford,    status: 'ACCEPTED'    as const },
+      { college: caltech,     status: 'REJECTED'    as const },
+      { college: cmu,         status: 'IN_PROGRESS' as const },
+      { college: harvard,     status: 'RESEARCHING' as const },
+      { college: ucBerkeley,  status: 'ACCEPTED'    as const },
+    ];
+
+    for (const { college, status } of trackedApps) {
+      await prisma.savedCollege.upsert({
+        where: { userId_collegeId: { userId: demoUser.id, collegeId: college.id } },
+        update: { status },
+        create: { userId: demoUser.id, collegeId: college.id, status },
+      });
+    }
+    console.log('  ✓ Demo user applications: ACCEPTED (Stanford, Berkeley), REJECTED (Caltech), SUBMITTED (MIT)');
   }
 
-  console.log('✅ Seed complete!');
+  // Candidate user tracker entries
+  if (mit && stanford && caltech && cornell && princeton) {
+    const [aisha, marcus, sofia] = candidateUsers;
+    const allCandidateApps = [
+      { userId: aisha.id,  collegeId: mit.id,           status: 'IN_PROGRESS' as const },
+      { userId: aisha.id,  collegeId: harvard?.id ?? '', status: 'RESEARCHING' as const },
+      { userId: marcus.id, collegeId: stanford.id,       status: 'SUBMITTED'   as const },
+      { userId: marcus.id, collegeId: cmu?.id ?? '',     status: 'IN_PROGRESS' as const },
+      { userId: sofia.id,  collegeId: cornell.id,        status: 'RESEARCHING' as const },
+      { userId: sofia.id,  collegeId: princeton.id,      status: 'RESEARCHING' as const },
+    ];
+    const candidateApps = allCandidateApps.filter((a) => a.collegeId !== '');
+
+    for (const app of candidateApps) {
+      if (!app.collegeId) continue;
+      await prisma.savedCollege.upsert({
+        where: { userId_collegeId: { userId: app.userId, collegeId: app.collegeId } },
+        update: { status: app.status },
+        create: app,
+      });
+    }
+    console.log('  ✓ Candidate user application entries seeded');
+  }
+
+  // ─── Saved Comparisons for Demo User ─────────────────────────────────────
+  if (mit && stanford && caltech && cmu) {
+    const comparisons = [
+      { name: 'Top STEM Schools',        collegeIds: [mit.id, caltech.id, stanford.id] },
+      { name: 'CS Powerhouses',          collegeIds: [cmu.id, stanford.id, mit.id] },
+      { name: 'MIT vs Stanford',         collegeIds: [mit.id, stanford.id] },
+    ];
+
+    for (const comp of comparisons) {
+      const existing = await prisma.savedComparison.findFirst({
+        where: { userId: demoUser.id, name: comp.name },
+      });
+      if (!existing) {
+        await prisma.savedComparison.create({
+          data: { userId: demoUser.id, ...comp },
+        });
+      }
+    }
+    console.log('  ✓ 3 saved comparisons seeded for demo user');
+  }
+
+  // ─── Rich Reviews Across 6 Colleges ──────────────────────────────────────
+  console.log('⭐ Seeding reviews...');
+
+  const reviewSeeds = [
+    // MIT
+    { slug: 'mit', user: candidateUsers[3], rating: 5, title: 'The best STEM education on Earth', body: 'MIT completely transformed my understanding of what research means. The UROP program let me work in a nanotechnology lab as a sophomore. Psets are brutal but the community gets you through. Career services placed me at a top AI lab. Worth every penny.' },
+    { slug: 'mit', user: candidateUsers[0], rating: 5, title: 'Incredible research opportunities', body: 'The research facilities here are unmatched. I had access to electron microscopes and quantum computing labs that most PhDs never see. Professors are genuinely accessible — I co-authored a paper with my advisor in junior year.' },
+    { slug: 'mit', user: demoUser,          rating: 4, title: 'World-class but intense', body: 'MIT is unlike anything else. The "firehose" metaphor is real — you will be overwhelmed. But the people around you are so brilliant that you rise to meet them. The collaborative culture actually surprised me; it\'s not cutthroat at all.' },
+    // Stanford
+    { slug: 'stanford', user: candidateUsers[1], rating: 5, title: 'Best CS program for builders', body: 'Stanford\'s connection to Silicon Valley is not just proximity — it\'s cultural. VCs come to office hours. Founders drop by dorms. I had my startup funded before I graduated. The CS curriculum is rigorous but leaves room for entrepreneurship.' },
+    { slug: 'stanford', user: candidateUsers[4], rating: 4, title: 'Amazing campus, competitive vibe', body: 'Stanford is gorgeous and the weather is perfect year-round. The interdisciplinary programs like CS+Biology or CS+Music are genuinely creative. Financial aid was generous — my package covered most costs.' },
+    // Harvard
+    { slug: 'harvard', user: candidateUsers[2], rating: 5, title: 'Opens every door', body: 'The Harvard name genuinely opens doors in ways I couldn\'t have imagined. The alumni network is absurdly strong — I got my investment banking role through a cold LinkedIn message to a Harvard alum. Academically challenging but manageable with the right study groups.' },
+    { slug: 'harvard', user: candidateUsers[3], rating: 4, title: 'Prestige + substance', body: 'The Gen Ed requirements force you to think across disciplines. I came in as a CS person and ended up taking political philosophy and cognitive science — both of which shaped my product thinking more than any CS class.' },
+    // Caltech
+    { slug: 'caltech', user: candidateUsers[3], rating: 5, title: 'Density of genius is unreal', body: 'Caltech has 980 undergrads and 9 Nobel laureates on faculty. The Honor Code means you can reschedule your own exams. JPL access for aerospace students is a huge privilege. The campus is intimate and everyone knows everyone.' },
+    { slug: 'caltech', user: candidateUsers[1], rating: 4, title: 'Pure STEM excellence', body: 'If you love problem-solving for its own sake, Caltech is nirvana. The curriculum is harder than MIT in some ways. Social life is quieter but Hovse culture creates real community. Research output per student is insane.' },
+    // CMU
+    { slug: 'cmu', user: candidateUsers[1], rating: 5, title: '#1 CS program, no contest', body: 'The School of Computer Science at CMU is relentless. You will work harder than you ever have, but the technical foundation it gives you is unbeatable. I had 5 return offers from top tech companies after my junior-year internship — all CMU interviews.' },
+    { slug: 'cmu', user: demoUser,          rating: 4, title: 'Great for tech, okay for everything else', body: 'CMU is a tech school first. The arts programs are surprisingly strong (drama, music) which balances the vibe. Pittsburgh is underrated as a city — affordable, great food, and the Rust Belt revival is real. Winters are tough though.' },
+    // UC Berkeley
+    { slug: 'uc-berkeley', user: candidateUsers[2], rating: 5, title: 'World-class at a fraction of the price', body: 'Berkeley\'s CS program is Ivy-tier for a state-school price tag (if you\'re in-state). The EECS program is brutal to get into but the alumni network in the Bay is second only to Stanford. The activism culture makes you a more aware person.' },
+    { slug: 'uc-berkeley', user: candidateUsers[4], rating: 4, title: 'Scale is both weakness and strength', body: 'Berkeley is massive. You have to be proactive — go to office hours, join clubs, seek out professors. But the upside is you get industry speakers, startup resources, and student orgs that rival full companies. QSE program is excellent.' },
+    // Cornell
+    { slug: 'cornell', user: candidateUsers[0], rating: 4, title: 'Breadth + Depth done right', body: 'Cornell\'s Engineering is top-10 and the campus in Ithaca is stunning. The interdisciplinary options — I took courses in ILR, Hotel, and Engineering — are genuinely unique among Ivy League schools. Gorges walks are the best stress relief.' },
+    // Princeton
+    { slug: 'princeton', user: candidateUsers[3], rating: 5, title: 'The undergraduate focus matters', body: 'Princeton\'s undergraduate-first philosophy is real. There is no law school or business school competing for faculty attention. Every grad student wants to TA. The thesis requirement is terrifying and then the most rewarding thing you\'ll do.' },
+  ];
+
+  let reviewCount = 0;
+  for (const r of reviewSeeds) {
+    const college = await prisma.college.findUnique({ where: { slug: r.slug } });
+    if (!college) continue;
+    const exists = await prisma.review.findFirst({
+      where: { userId: r.user.id, collegeId: college.id },
+    });
+    if (!exists) {
+      await prisma.review.create({
+        data: {
+          userId: r.user.id,
+          collegeId: college.id,
+          rating: r.rating,
+          title: r.title,
+          body: r.body,
+        },
+      });
+      reviewCount++;
+    }
+  }
+  console.log('  ✓', reviewCount, 'reviews seeded');
+
+  // ─── Rich Discussions with Upvotes ────────────────────────────────────────
+  console.log('💬 Seeding discussions...');
+
+  const [aisha, marcus, sofia, ethan, priya] = candidateUsers;
+
+  const discussionData = [
+    {
+      userId: demoUser.id,
+      title: 'MIT vs Stanford for AI/ML — which campus culture fits a builder?',
+      body: 'I\'m deciding between MIT and Stanford for CS with a focus on AI/ML. Both have incredible programs but the cultures seem very different. MIT feels more research-pure while Stanford feels more startup-oriented. Would love to hear from people who considered both. Which recruiting networks are stronger for ML roles at top labs?',
+      tags: ['admissions', 'CS', 'AI/ML', 'MIT', 'Stanford'],
+      upvotes: 42,
+      collegeSlug: 'mit',
+    },
+    {
+      userId: aisha.id,
+      title: 'How competitive is CMU MSCS vs direct BS admission for international students?',
+      body: 'As an international student from India with a 1520 SAT and 3.92 GPA, I\'m trying to understand whether CMU\'s undergrad CS is realistic or if I should target a strong MS program later. The acceptance rate for international students seems even lower. Anyone have data or experience with this?',
+      tags: ['international', 'CMU', 'CS', 'admissions'],
+      upvotes: 28,
+      collegeSlug: 'cmu',
+    },
+    {
+      userId: marcus.id,
+      title: 'Financial aid comparison: MIT vs Harvard vs Princeton for middle-income families?',
+      body: 'My family income is around $120k/year. I\'ve heard MIT and Princeton meet 100% of demonstrated need. How does Harvard compare in practice? Are there families in this income bracket who ended up paying more at Harvard than MIT? Trying to model actual out-of-pocket costs for a realistic comparison.',
+      tags: ['financial-aid', 'MIT', 'Harvard', 'Princeton', 'scholarships'],
+      upvotes: 67,
+      collegeSlug: null,
+    },
+    {
+      userId: ethan.id,
+      title: 'Caltech vs MIT for physics research — which has better undergrad access to faculty labs?',
+      body: 'I want to do theoretical physics research with the goal of a PhD at Princeton or Cambridge. Caltech has a smaller student body which might mean more faculty access, but MIT has more research funding. Anyone done UROP at MIT or SURF at Caltech? How easy was it to get into top labs as a freshman?',
+      tags: ['physics', 'research', 'Caltech', 'MIT', 'PhD'],
+      upvotes: 35,
+      collegeSlug: null,
+    },
+    {
+      userId: sofia.id,
+      title: 'Is UC Berkeley worth it for Economics over UPenn Wharton at 3x the price?',
+      body: 'Berkeley Economics vs Wharton — this is my dilemma. Berkeley is in-state for me ($30k/yr) vs Wharton ($82k/yr). Both are top economics programs but Wharton has the finance brand. I want to go into consulting or economic policy, not necessarily Wall Street. Is Wharton\'s premium justified?',
+      tags: ['economics', 'Berkeley', 'UPenn', 'cost', 'Wharton'],
+      upvotes: 54,
+      collegeSlug: null,
+    },
+    {
+      userId: priya.id,
+      title: 'Best Environmental Science programs at top universities — rankings vs actual output?',
+      body: 'The standard rankings don\'t capture environmental programs well. Looking for programs with strong field research components, good faculty doing actual conservation work, and connections to NGOs and policy orgs. Have heard good things about Yale SEAS, Duke Nicholas School, and Michigan. Anyone have insights?',
+      tags: ['environmental-science', 'sustainability', 'rankings'],
+      upvotes: 19,
+      collegeSlug: null,
+    },
+    {
+      userId: demoUser.id,
+      title: 'Cornell Engineering vs UIUC CS — which has better industry recruiting for SWE?',
+      body: 'Cornell Engineering (Ivy prestige, smaller class) vs UIUC CS (big tech recruiting machine, CS@Illinois brand). Both have strong alumni networks in different ways. I care most about getting into FAANG straight out of undergrad. Is the Ivy name at Cornell worth it vs UIUC\'s sheer placement numbers for SWE?',
+      tags: ['Cornell', 'UIUC', 'SWE', 'FAANG', 'recruiting'],
+      upvotes: 31,
+      collegeSlug: null,
+    },
+    {
+      userId: marcus.id,
+      title: 'How important is the senior thesis for grad school applications?',
+      body: 'Princeton famously requires a senior thesis. Harvard and MIT have optional thesis programs. For PhD applications in CS or Econ, how much does a strong thesis (vs no thesis) matter? Does a published paper from UROP at MIT beat a thesis? Trying to optimize my strategy for PhD applications 4 years from now.',
+      tags: ['grad-school', 'PhD', 'thesis', 'research', 'Princeton'],
+      upvotes: 23,
+      collegeSlug: null,
+    },
+    {
+      userId: aisha.id,
+      title: 'Biomedical Engineering at Johns Hopkins vs MIT — lab access and clinical exposure?',
+      body: 'JHU BME is legendarily close to the hospital system. MIT BME has the engineering depth. I want to go into medical devices or biotech. Where do undergrads actually get hands-on time with clinical settings? Does MIT\'s hospital affiliation (MGH/Brigham) give similar exposure as JHU\'s physical adjacency?',
+      tags: ['biomedical', 'JHU', 'MIT', 'healthcare', 'research'],
+      upvotes: 16,
+      collegeSlug: null,
+    },
+    {
+      userId: ethan.id,
+      title: 'Is a 1590 SAT with 4.0 GPA competitive for Caltech or MIT without research?',
+      body: 'I have near-perfect stats but no formal research experience (small rural high school with no university access). I have independent projects — built a spectrometer, wrote a small quantum simulation in Python. How much does the absence of official research hurt at Caltech and MIT? Any other ways to demonstrate scientific curiosity?',
+      tags: ['stats', 'Caltech', 'MIT', 'research', 'admissions'],
+      upvotes: 48,
+      collegeSlug: null,
+    },
+  ];
+
+  const seededDiscussions: Record<string, string> = {};
+  let discussionCount = 0;
+
+  for (const d of discussionData) {
+    const exists = await prisma.discussion.findFirst({
+      where: { userId: d.userId, title: d.title },
+    });
+    if (exists) {
+      seededDiscussions[d.title] = exists.id;
+      continue;
+    }
+    let collegeId: string | null = null;
+    if (d.collegeSlug) {
+      const col = await prisma.college.findUnique({ where: { slug: d.collegeSlug } });
+      collegeId = col?.id ?? null;
+    }
+    const created = await prisma.discussion.create({
+      data: {
+        userId: d.userId,
+        title: d.title,
+        body: d.body,
+        tags: d.tags,
+        upvotes: d.upvotes,
+        collegeId,
+      },
+    });
+    seededDiscussions[d.title] = created.id;
+    discussionCount++;
+  }
+  console.log('  ✓', discussionCount, 'discussions seeded');
+
+  // ─── Answers (22) with Upvotes + Accepted Flags ───────────────────────────
+  console.log('💡 Seeding answers...');
+
+  const answerData: Array<{
+    discussionTitle: string;
+    userId: string;
+    body: string;
+    upvotes: number;
+    isAccepted: boolean;
+  }> = [
+    // MIT vs Stanford thread
+    {
+      discussionTitle: 'MIT vs Stanford for AI/ML — which campus culture fits a builder?',
+      userId: ethan.id,
+      body: 'Spent a summer at MIT CSAIL and interned at a Stanford lab the following year. MIT culture is "show me the math" — everything is proven from first principles. Stanford culture is "ship it and iterate." For ML research, MIT gives you better theoretical grounding. For building ML products, Stanford connects you to the people funding them. Choose based on your 5-year goal, not prestige.',
+      upvotes: 38,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'MIT vs Stanford for AI/ML — which campus culture fits a builder?',
+      userId: marcus.id,
+      body: 'The recruiting networks are different in kind, not just strength. MIT\'s network is strong in research labs (DeepMind, OpenAI, Google Brain) while Stanford\'s alumni are more concentrated in startups and Series A companies. Both will get you FAANG offers — the differentiation is at the frontier.',
+      upvotes: 24,
+      isAccepted: false,
+    },
+    // Financial aid thread
+    {
+      discussionTitle: 'Financial aid comparison: MIT vs Harvard vs Princeton for middle-income families?',
+      userId: demoUser.id,
+      body: 'At $120k family income: MIT typically expects around $15-20k/year contribution, Harvard around $18-25k, Princeton around $12-18k. Princeton historically has the most generous aid for middle-income families because they eliminated loans entirely from their packages — you\'ll never borrow to attend Princeton if you get in. MIT comes close. Harvard is generous but slightly less so at exactly your income level.',
+      upvotes: 52,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'Financial aid comparison: MIT vs Harvard vs Princeton for middle-income families?',
+      userId: priya.id,
+      body: 'One thing to verify: Harvard counts home equity in their financial aid formula, which MIT doesn\'t (as of the last policy update I saw). If your parents have significant home equity from a paid-down mortgage, Harvard\'s actual ask may be meaningfully higher than the calculator shows. Always call the financial aid office directly with your specific numbers.',
+      upvotes: 41,
+      isAccepted: false,
+    },
+    {
+      discussionTitle: 'Financial aid comparison: MIT vs Harvard vs Princeton for middle-income families?',
+      userId: aisha.id,
+      body: 'Don\'t forget to factor in actual cost of living differences. Cambridge and Ithaca have very different rent markets. Also Princeton\'s meal plan is mandatory and expensive — subtract from their aid generosity when comparing final numbers.',
+      upvotes: 17,
+      isAccepted: false,
+    },
+    // Caltech vs MIT physics thread
+    {
+      discussionTitle: 'Caltech vs MIT for physics research — which has better undergrad access to faculty labs?',
+      userId: demoUser.id,
+      body: 'The SURF program at Caltech is genuinely exceptional — it\'s one of the most competitive summer research programs in the country and gives you 10 weeks fully funded in a Caltech lab. UROP at MIT is more accessible (you can start freshman fall) but less curated. If you want to do LIGO gravitational wave research, Caltech is the obvious answer. If you want condensed matter or quantum information, MIT is stronger.',
+      upvotes: 29,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'Caltech vs MIT for physics research — which has better undergrad access to faculty labs?',
+      userId: marcus.id,
+      body: 'Class size matters a lot here. Caltech physics cohort is ~30 students. MIT is ~100+. That means at Caltech every professor knows your name by end of sophomore year. At MIT you have to be more proactive to stand out. For PhD placement, both feed into the top 5 physics programs equally well.',
+      upvotes: 22,
+      isAccepted: false,
+    },
+    // Berkeley vs Wharton thread
+    {
+      discussionTitle: 'Is UC Berkeley worth it for Economics over UPenn Wharton at 3x the price?',
+      userId: ethan.id,
+      body: 'For consulting (McKinsey/BCG/Bain), both recruit heavily. For policy work and academic economics, Berkeley PhD pipeline is actually stronger because the research culture is more academic than Wharton\'s. For Wall Street IBD, Wharton wins by a mile. If you\'re genuinely policy-oriented, Berkeley at $30k/yr vs Wharton at $82k/yr is a no-brainer financially and academically.',
+      upvotes: 47,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'Is UC Berkeley worth it for Economics over UPenn Wharton at 3x the price?',
+      userId: aisha.id,
+      body: 'The $52k/year difference compounds over 4 years to ~$200k+ in loans vs no loans. That\'s a massive life decision, not just a school decision. The finance premium Wharton charges is real but only pays off if you\'re going into high-compensation finance roles. Be honest with yourself about what you actually want to do.',
+      upvotes: 35,
+      isAccepted: false,
+    },
+    // Environmental Science thread
+    {
+      discussionTitle: 'Best Environmental Science programs at top universities — rankings vs actual output?',
+      userId: sofia.id,
+      body: 'Yale SEAS (School of the Environment) is the gold standard for policy-oriented environmental work. The faculty include some of the authors of the IPCC reports. Duke Nicholas School is better for field work and conservation biology. If you care about climate finance and carbon markets, Columbia SIPA and Fletcher at Tufts are worth looking at alongside the science programs.',
+      upvotes: 21,
+      isAccepted: true,
+    },
+    // Cornell vs UIUC thread
+    {
+      discussionTitle: 'Cornell Engineering vs UIUC CS — which has better industry recruiting for SWE?',
+      userId: marcus.id,
+      body: 'UIUC CS at Illinois sends more students to FAANG than almost any other school in raw numbers — the Career Fair is genuinely legendary, with 400+ companies. Cornell is smaller with more selective recruiting pathways. If your goal is an offer from Google/Meta by junior year, UIUC\'s sheer volume works in your favor. Cornell is better if you want trading firms or hedge fund quant roles (Ivy brand matters more there).',
+      upvotes: 33,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'Cornell Engineering vs UIUC CS — which has better industry recruiting for SWE?',
+      userId: demoUser.id,
+      body: 'I\'d also consider the transfer risk. Cornell Engineering is hard to stay in if you struggle first semester. UIUC CS is slightly more flexible in course planning. If you\'re confident in your technical ability, Cornell. If you want a more supported ramp-up, UIUC.',
+      upvotes: 18,
+      isAccepted: false,
+    },
+    // CMU international thread
+    {
+      discussionTitle: 'How competitive is CMU MSCS vs direct BS admission for international students?',
+      userId: ethan.id,
+      body: 'CMU CS undergrad is one of the hardest admissions in the US for any applicant — international acceptance is likely under 3%. The MSCS is more accessible but still competitive. A strong path: attend a top public school for undergrad (Berkeley, Michigan, UIUC), build research/internship credentials, then apply to CMU MSCS. The career outcomes are nearly identical and the debt is manageable.',
+      upvotes: 26,
+      isAccepted: true,
+    },
+    // Thesis thread
+    {
+      discussionTitle: 'How important is the senior thesis for grad school applications?',
+      userId: aisha.id,
+      body: 'A strong thesis with faculty advisor endorsement is excellent for PhD applications. But a published paper from UROP beats a thesis in almost every case because publication = peer-reviewed external validation. If you can get a paper submitted (even to arXiv) by senior year, that matters more to grad admissions than any thesis.',
+      upvotes: 19,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'How important is the senior thesis for grad school applications?',
+      userId: priya.id,
+      body: 'For programs like Princeton or Harvard that require/strongly encourage a thesis, it\'s table stakes. For MIT or Stanford PhD apps, the LoR from your thesis advisor carries more weight than the thesis itself. A mediocre thesis with a lukewarm LoR is worse than no thesis with an enthusiastic LoR from a professor you worked closely with.',
+      upvotes: 14,
+      isAccepted: false,
+    },
+    // JHU vs MIT BME thread
+    {
+      discussionTitle: 'Biomedical Engineering at Johns Hopkins vs MIT — lab access and clinical exposure?',
+      userId: demoUser.id,
+      body: 'JHU\'s advantage is geographical and structural — the hospital is literally across the street and undergrads can shadow and assist in clinical research. MIT\'s MGH and Brigham affiliation is real but requires more initiative to access. For medical devices: MIT\'s engineering depth wins. For clinical research and translational medicine: JHU wins. What type of BME career do you want?',
+      upvotes: 14,
+      isAccepted: true,
+    },
+    // Stats/research thread
+    {
+      discussionTitle: 'Is a 1590 SAT with 4.0 GPA without research competitive for Caltech or MIT?',
+      userId: sofia.id,
+      body: 'The spectrometer and quantum simulation projects are actually stronger than most "official" research if you can demonstrate depth and your own intellectual curiosity. Admissions officers at MIT and Caltech are looking for people who do science because they can\'t not do it — not people who found a professor to stamp their resume. Write compellingly about the WHY behind your projects.',
+      upvotes: 44,
+      isAccepted: true,
+    },
+    {
+      discussionTitle: 'Is a 1590 SAT with 4.0 GPA without research competitive for Caltech or MIT?',
+      userId: marcus.id,
+      body: 'For context: MIT\'s acceptance rate is under 4%. Even perfect stats don\'t guarantee admission. Apply to a range. Your stats put you solidly in range for Caltech and MIT but you need something that makes an admissions officer remember you — and your independent projects sound like that thing.',
+      upvotes: 29,
+      isAccepted: false,
+    },
+    {
+      discussionTitle: 'Is a 1590 SAT with 4.0 GPA without research competitive for Caltech or MIT?',
+      userId: ethan.id,
+      body: 'I was in a similar boat — rural high school, no formal research, lots of independent projects. Got into Caltech. The essays are your entire application at these schools. Stats just get you read. The narrative you build around your curiosity and independent learning is what gets you in.',
+      upvotes: 51,
+      isAccepted: false,
+    },
+  ];
+
+  let answerCount = 0;
+  for (const a of answerData) {
+    const discussionId = seededDiscussions[a.discussionTitle];
+    if (!discussionId) continue;
+    const exists = await prisma.answer.findFirst({
+      where: { userId: a.userId, discussionId },
+    });
+    if (!exists) {
+      await prisma.answer.create({
+        data: {
+          userId: a.userId,
+          discussionId,
+          body: a.body,
+          upvotes: a.upvotes,
+          isAccepted: a.isAccepted,
+        },
+      });
+      answerCount++;
+    }
+  }
+  console.log('  ✓', answerCount, 'answers seeded');
+
+  console.log('\n✅ Seed complete!');
+  console.log('   📊 Colleges:     ', colleges.length);
+  console.log('   👥 Users:        ', 2 + candidateUsers.length, '(demo + admin + 5 candidates)');
+  console.log('   ⭐ Reviews:      ', reviewSeeds.length);
+  console.log('   💬 Discussions:  ', discussionData.length);
+  console.log('   💡 Answers:      ', answerData.length);
+  console.log('   📑 Comparisons:  3');
 }
 
 main()

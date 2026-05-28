@@ -16,14 +16,20 @@ const userCreateSchema = z.object({
   role: z.enum(['USER', 'SUB_ADMIN', 'ADMIN']).optional().default('USER'),
 });
 
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().max(100).optional().default(''),
+});
+
 async function getRole(email: string | null | undefined): Promise<string> {
   if (!email) return 'USER';
   const normalized = email.toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  const user = await prisma.user.findUnique({ where: { email: normalized }, select: { role: true } });
   return user?.role || 'USER';
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -35,21 +41,51 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
 
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        gpa: true,
-        sat: true,
-        major: true,
-        role: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
+    const { searchParams } = new URL(req.url);
+    const parsed = listQuerySchema.safeParse({
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      q: searchParams.get('q') || undefined,
     });
 
-    return NextResponse.json({ users });
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { page, limit, q } = parsed.data;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = q
+      ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { major: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          gpa: true,
+          sat: true,
+          major: true,
+          role: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return NextResponse.json({ users, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('Admin fetch users error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -105,7 +141,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Auto-seed demo college tracking for the new user for immediate guided onboarding
+    // Auto-seed demo college tracking for the new user
     const mit = await prisma.college.findUnique({ where: { slug: 'mit' } });
     const stanford = await prisma.college.findUnique({ where: { slug: 'stanford' } });
     const caltech = await prisma.college.findUnique({ where: { slug: 'caltech' } });
