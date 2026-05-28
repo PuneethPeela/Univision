@@ -107,18 +107,42 @@ What else can I clarify about your admissions journey?`;
     setInput('');
     setIsTyping(true);
 
-    // Simulate natural AI agent typing lag
-    setTimeout(() => {
-      const aiReplyText = getAIResponse(text);
-      const aiMsg: Message = {
-        sender: 'assistant',
-        text: aiReplyText,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 900);
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reply) {
+          setMessages((prev) => [
+            ...prev,
+            { sender: 'assistant', text: data.reply, timestamp: new Date() },
+          ]);
+          setIsTyping(false);
+          return;
+        }
+      }
+      
+      // Fallback if HTTP error (e.g. 401 unauthenticated or other codes)
+      throw new Error('Fallback to local AI engine');
+    } catch (err) {
+      // Natural AI agent typing lag simulator for fallback
+      setTimeout(() => {
+        const aiReplyText = getAIResponse(text);
+        const aiMsg: Message = {
+          sender: 'assistant',
+          text: aiReplyText,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+        setIsTyping(false);
+      }, 700);
+    }
   };
+
 
   const quickQuestions = [
     { text: 'Compare Stanford vs Caltech', label: '⚖️ Stanford vs Caltech' },
