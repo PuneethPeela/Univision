@@ -18,13 +18,12 @@ setInterval(() => {
   }
 }, 300000);
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const method = req.method;
 
   // 1. IP extraction for rate limiting
   const ip = (req as any).ip || req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '127.0.0.1';
-
 
   // 2. Identify the rate limit category
   let limitType: 'auth' | 'write' | 'read' = 'read';
