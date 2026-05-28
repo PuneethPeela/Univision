@@ -5,11 +5,12 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { resolveRole, validatePasswordStrength, sanitizeText } from '@/lib/security';
 
 const userCreateSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email').max(150),
+  password: z.string(),
   gpa: z.number().min(0).max(4.0).nullable().optional(),
   sat: z.number().min(400).max(1600).nullable().optional(),
   major: z.string().min(1).max(100).nullable().optional(),
@@ -22,13 +23,6 @@ const listQuerySchema = z.object({
   q: z.string().max(100).optional().default(''),
 });
 
-async function getRole(email: string | null | undefined): Promise<string> {
-  if (!email) return 'USER';
-  const normalized = email.toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: normalized }, select: { role: true } });
-  return user?.role || 'USER';
-}
-
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -36,7 +30,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const role = await getRole(session.user.email);
+    const role = await resolveRole(session.user.email);
     if (role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
@@ -99,7 +93,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const role = await getRole(session.user.email);
+    const role = await resolveRole(session.user.email);
     if (role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden: Admin privilege required' }, { status: 403 });
     }
@@ -112,7 +106,20 @@ export async function POST(req: NextRequest) {
 
     const { name, email, password, gpa, sat, major, role: targetRole } = parsed.data;
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // Validate password strength
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.valid) {
+      return NextResponse.json(
+        { error: { password: [passwordCheck.message || 'Weak password'] } },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const sanitizedName = sanitizeText(name);
+    const sanitizedMajor = major ? sanitizeText(major) : 'Computer Science';
+
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
     }
@@ -121,12 +128,12 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: sanitizedName,
+        email: normalizedEmail,
         passwordHash,
         gpa: gpa ?? 3.8,
         sat: sat ?? 1450,
-        major: major ?? 'Computer Science',
+        major: sanitizedMajor,
         role: targetRole,
       },
       select: {
@@ -162,3 +169,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+

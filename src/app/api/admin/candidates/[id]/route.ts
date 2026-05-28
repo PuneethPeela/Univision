@@ -4,23 +4,18 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { resolveRole, sanitizeText } from '@/lib/security';
+import { ApplicationStatus } from '@prisma/client';
 
 const candidateUpdateSchema = z.object({
-  name: z.string().min(2).optional(),
+  name: z.string().min(2).max(100).optional(),
   gpa: z.number().min(0).max(4.0).nullable().optional(),
   sat: z.number().min(400).max(1600).nullable().optional(),
-  major: z.string().min(1).nullable().optional(),
+  major: z.string().min(1).max(100).nullable().optional(),
   // For updating a saved college status
   savedCollegeId: z.string().optional(),
-  status: z.string().optional(),
+  status: z.nativeEnum(ApplicationStatus).optional(),
 });
-
-async function getRole(email: string | null | undefined): Promise<string> {
-  if (!email) return 'USER';
-  const normalized = email.toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
-  return user?.role || 'USER';
-}
 
 export async function GET(
   req: NextRequest,
@@ -32,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const currentRole = await getRole(session.user.email);
+    const currentRole = await resolveRole(session.user.email);
     if (currentRole !== 'ADMIN' && currentRole !== 'SUB_ADMIN') {
       return NextResponse.json({ error: 'Forbidden: Admin or Sub-Admin access required' }, { status: 403 });
     }
@@ -108,7 +103,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const currentRole = await getRole(session.user.email);
+    const currentRole = await resolveRole(session.user.email);
     if (currentRole !== 'ADMIN' && currentRole !== 'SUB_ADMIN') {
       return NextResponse.json({ error: 'Forbidden: Admin or Sub-Admin access required' }, { status: 403 });
     }
@@ -146,11 +141,11 @@ export async function PATCH(
     }
 
     // Handle candidate academic profile update
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
+    const updateData: Parameters<typeof prisma.user.update>[0]['data'] = {};
+    if (name !== undefined) updateData.name = sanitizeText(name);
     if (gpa !== undefined) updateData.gpa = gpa;
     if (sat !== undefined) updateData.sat = sat;
-    if (major !== undefined) updateData.major = major;
+    if (major !== undefined) updateData.major = major !== null ? sanitizeText(major) : null;
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -171,3 +166,4 @@ export async function PATCH(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+

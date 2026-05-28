@@ -4,6 +4,15 @@ import GoogleProvider from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.NEXT_PHASE !== 'phase-production-build' &&
+  (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32)
+) {
+  throw new Error('FATAL: NEXTAUTH_SECRET is not configured or is too weak (must be >= 32 characters in production).');
+}
+
+
 export const authOptions: NextAuthOptions = {
   providers: [
     // Google OAuth — only enabled when env vars are present
@@ -43,18 +52,33 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: { strategy: 'jwt' },
+  session: {
+    strategy: 'jwt',
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  },
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   pages: { signIn: '/auth' },
   callbacks: {
     async signIn({ user, account }) {
       // For Google OAuth: auto-create or link the user record in our database
       if (account?.provider === 'google' && user.email) {
-        let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        const normalizedEmail = user.email.toLowerCase().trim();
+        let dbUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
         if (!dbUser) {
           // Create a new user from Google profile with onboarding defaults
           dbUser = await prisma.user.create({
             data: {
-              email: user.email,
+              email: normalizedEmail,
               name: user.name || 'Google User',
               image: user.image || null,
               gpa: 3.8,
@@ -91,14 +115,15 @@ export const authOptions: NextAuthOptions = {
       }
       // For Google OAuth: find our database user cuid and map it to token.sub
       if (account?.provider === 'google' && token.email) {
-        const dbUser = await prisma.user.findUnique({ where: { email: token.email } });
+        const normalizedEmail = token.email.toLowerCase().trim();
+        const dbUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
         if (dbUser) {
           token.sub = dbUser.id;
         }
       }
       return token;
     },
-
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+

@@ -75,6 +75,7 @@ model User {
   answers          Answer[]
   reviews          Review[]
   savedComparisons SavedComparison[]
+  upvotedDiscussions UserDiscussionUpvote[]
 
   @@index([role])
   @@index([email])
@@ -109,6 +110,7 @@ model Discussion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   answers   Answer[]
+  upvotedBy UserDiscussionUpvote[]
 
   @@index([userId])
   @@index([collegeId])
@@ -159,3 +161,16 @@ model SavedComparison {
 
   @@index([userId])
 }
+
+model UserDiscussionUpvote {
+  userId       String
+  discussionId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([userId, discussionId])
+  @@index([discussionId])
+  @@index([userId])
+}
+

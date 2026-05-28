@@ -3,13 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-
-async function getRole(email: string | null | undefined): Promise<string> {
-  if (!email) return 'USER';
-  const normalized = email.toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
-  return user?.role || 'USER';
-}
+import { resolveRole } from '@/lib/security';
 
 export async function GET() {
   try {
@@ -18,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const currentRole = await getRole(session.user.email);
+    const currentRole = await resolveRole(session.user.email);
     if (currentRole !== 'ADMIN' && currentRole !== 'SUB_ADMIN') {
       return NextResponse.json({ error: 'Forbidden: Admin or Sub-Admin access required' }, { status: 403 });
     }
@@ -47,3 +41,4 @@ export async function GET() {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
