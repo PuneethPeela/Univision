@@ -1549,7 +1549,18 @@ function DashboardContent() {
                     <tbody className="divide-y divide-white/5 text-onSurface">
                       {filteredUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-white/2 transition-colors">
-                          <td className="py-3 px-4 font-semibold">{u.name || 'Anonymous User'}</td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-onSurface">{u.name || 'Anonymous User'}</div>
+                            <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-extrabold mt-1 uppercase tracking-wider ${
+                              u.role === 'ADMIN' 
+                                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
+                                : u.role === 'SUB_ADMIN' 
+                                ? 'bg-cyan/20 text-cyan border border-cyan/30' 
+                                : 'bg-white/10 text-muted border border-white/10'
+                            }`}>
+                              {u.role === 'ADMIN' ? '🛡️ Super Admin' : u.role === 'SUB_ADMIN' ? '🔬 Sub-Admin' : '🎓 Scholar'}
+                            </span>
+                          </td>
                           <td className="py-3 px-4 font-mono text-muted">{u.email}</td>
                           <td className="py-3 px-4 leading-normal text-muted font-semibold">
                             GPA: <span className="text-cyan font-bold">{u.gpa != null ? u.gpa.toFixed(2) : '—'}</span> | 
