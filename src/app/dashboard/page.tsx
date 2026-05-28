@@ -522,7 +522,7 @@ function DashboardContent() {
   };
 
   const handleDeleteUser = async (id: string, name: string) => {
-    if (!window.confirm(`Are you absolutely sure you want to delete user ${name}? This will permanently wipe all their college tracking lists, discussions, and reviews!`)) return;
+    if (!window.confirm(`Are you absolutely sure you want to delete user ${name}? This will permanently wipe all their college tracking lists, discussions, and reviews! Do you want to continue?`)) return;
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: 'DELETE',
