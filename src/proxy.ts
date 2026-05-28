@@ -27,10 +27,15 @@ export async function proxy(req: NextRequest) {
 
   // 2. Identify the rate limit category
   let limitType: 'auth' | 'write' | 'read' = 'read';
-  if (pathname.startsWith('/api/auth/')) {
+  const isAuthWrite = pathname.startsWith('/api/auth/') && (method === 'POST' || method === 'PATCH' || method === 'DELETE');
+  const isPublicAuthRoute = pathname === '/api/auth/register' || pathname === '/api/auth/forgot-password';
+
+  if (isAuthWrite || isPublicAuthRoute) {
     limitType = 'auth';
   } else if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
     limitType = 'write';
+  } else if (pathname.startsWith('/api/auth/')) {
+    limitType = 'read'; // GET routes of NextAuth (session, csrf, providers) map to higher default read limits
   }
 
   // Define limits & window
